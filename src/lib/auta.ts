@@ -126,7 +126,10 @@ export function wyposazenie(s?: Szczegoly) {
   return s ? WYPOSAZENIE.filter(([k]) => s[k] === true).map(([, nazwa]) => nazwa) : []
 }
 
-const dodatki = (s?: Szczegoly) => [
+const KOLORY: Record<string, string> = { black: "czarny", gray: "szary", grey: "szary", white: "biały", silver: "srebrny", blue: "niebieski", red: "czerwony", green: "zielony", brown: "brązowy", beige: "beżowy", yellow: "żółty", orange: "pomarańczowy", gold: "złoty", purple: "fioletowy" }
+
+export const dodatki = (s?: Szczegoly) => [
+  ...(typeof s?.colour === "string" ? [["Kolor", KOLORY[s.colour] ?? s.colour]] : []),
   ...(s?.doors ? [["Drzwi", String(s.doors)]] : []),
   ...(typeof s?.emissionStandard === "string" ? [["Norma emisji", s.emissionStandard]] : []),
 ]

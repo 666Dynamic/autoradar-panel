@@ -1,6 +1,6 @@
 import type JSZip from "jszip"
 
-import { fmt, FUEL, GEAR, hpLabel, kmLabel, litersLabel, offersLabel, regLabel, specyfikacjaAuta, tekstFacebook, tekstWhatsApp, wyposazenie, type Wiersz } from "@/lib/auta"
+import { dodatki, fmt, FUEL, GEAR, hpLabel, kmLabel, litersLabel, offersLabel, regLabel, specyfikacjaAuta, tekstFacebook, tekstWhatsApp, wyposazenie, type Wiersz } from "@/lib/auta"
 import { wczytajSzczegoly, type Szczegoly } from "@/lib/dane"
 import { odczytajOferty } from "@/lib/pamiec"
 
@@ -14,7 +14,7 @@ const nazwa = (tekst: string) => tekst.replace(/[^\p{L}\p{N} .-]/gu, "").trim().
 function trescOferty(r: Wiersz, s?: Szczegoly) {
   const sprzet = wyposazenie(s)
   return [r.title, r.id, "", ...specyfikacjaAuta(r).map(([k, v]) => `${k}: ${v}`),
-    ...(s?.doors ? [`Drzwi: ${s.doors}`] : []), ...(typeof s?.emissionStandard === "string" ? [`Norma emisji: ${s.emissionStandard}`] : []),
+    ...dodatki(s).map(([k, v]) => `${k}: ${v}`),
     ...(sprzet.length ? ["", "Wyposażenie:", ...sprzet.map((x) => `- ${x}`)] : [])].join("\n")
 }
 

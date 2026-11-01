@@ -28,6 +28,7 @@ export function OknoAuta({ auto, waluta, zamknij }: { auto: Wiersz | null; walut
               <DialogTitle className="pr-6">{auto.title || auto.id}</DialogTitle>
               <DialogDescription>{auto.id} · {auto._label}{auto.unroadworthy ? " · niezdatne do jazdy" : ""}</DialogDescription>
             </DialogHeader>
+            {auto.image && <img src={auto.image} alt={auto.title} loading="lazy" className="max-h-60 w-full rounded-lg object-cover" />}
             <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
               {[...specyfikacjaAuta(auto),
                 ["Auto1", fmt(kwota(auto, "a", waluta))], ["Otomoto", fmt(kwota(auto, "o", waluta))],

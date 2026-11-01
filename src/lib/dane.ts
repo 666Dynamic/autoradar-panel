@@ -15,6 +15,7 @@ export type Auto = {
   model: string | null
   auction: string | null
   body: string | null
+  image: string | null
   end_ms: number | null
   bid_eur: number | null
   bid_pln: number | null

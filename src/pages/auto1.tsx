@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -217,7 +218,12 @@ export function Auto1({ dane }: { dane: Dane }) {
                 <TableRow key={r.id} className={widziane.has(r.id) ? "opacity-60" : undefined} data-state={zaznaczone.has(r.id) ? "selected" : undefined}>
                   <TableCell><Checkbox aria-label={`Zaznacz ${r.id}`} checked={zaznaczone.has(r.id)} onCheckedChange={(v) => zaznacz(r.id, v === true)} /></TableCell>
                   <TableCell className="max-w-72 whitespace-normal">
-                    <button className="text-left font-medium hover:underline" onClick={() => ustawOtwarte(r)}>{r.title || r.id}</button>
+                    <HoverCard openDelay={200} closeDelay={0}>
+                      <HoverCardTrigger asChild>
+                        <button className="text-left font-medium hover:underline" onClick={() => ustawOtwarte(r)}>{r.title || r.id}</button>
+                      </HoverCardTrigger>
+                      {r.image && <HoverCardContent side="right" className="w-72 p-1"><img src={r.image} alt={r.title} className="rounded-md" /></HoverCardContent>}
+                    </HoverCard>
                     {r.unroadworthy && <Badge variant="destructive" className="ml-1">niezdatne</Badge>}
                     <div className="text-xs text-muted-foreground">{r.id} · {r._label}</div>
                   </TableCell>

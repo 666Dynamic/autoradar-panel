@@ -1,21 +1,7 @@
-# React + TypeScript + Vite + shadcn/ui
+# AutoRadar panel
 
-This is a template for a new Vite project with React, TypeScript, and shadcn/ui.
+Dashboard AutoRadar na GitHub Pages: Home, Auto1, Wycena. Dane z nocnego skanu czyta z `https://666dynamic.github.io/autoradar-migawka/data.json`.
 
-## Adding components
+Nowa podstrona: wpis w `src/components/app-sidebar.tsx` i w `src/App.tsx`, plik w `src/pages/`. Push na `main` publikuje stronę.
 
-To add components to your app, run the following command:
-
-```bash
-npx shadcn@latest add button
-```
-
-This will place the ui components in the `src/components` directory.
-
-## Using components
-
-To use the components in your app, import them as follows:
-
-```tsx
-import { Button } from "@/components/ui/button"
-```
+Podgląd z lokalnymi danymi: `public/data.json` i `VITE_DANE=/autoradar-panel/data.json npm run build`.

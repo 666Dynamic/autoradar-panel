@@ -1,20 +1,47 @@
-import { Button } from "@/components/ui/button"
+import * as React from "react"
+
+import { AppSidebar, STRONY } from "@/components/app-sidebar"
+import { SiteHeader } from "@/components/site-header"
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
+import { wczytajDane, type Dane } from "@/lib/dane"
+import { Auto1 } from "@/pages/auto1"
+import { Home } from "@/pages/home"
+import { Wycena } from "@/pages/wycena"
+
+const zAdresu = () => {
+  const id = window.location.hash.replace("#/", "")
+  return STRONY.some((s) => s.id === id) ? id : "home"
+}
 
 export function App() {
+  const [strona, ustawStrone] = React.useState(zAdresu)
+  const [dane, ustawDane] = React.useState<Dane | null>(null)
+  const [blad, ustawBlad] = React.useState(false)
+
+  React.useEffect(() => {
+    const zmien = () => ustawStrone(zAdresu())
+    window.addEventListener("hashchange", zmien)
+    return () => window.removeEventListener("hashchange", zmien)
+  }, [])
+  React.useEffect(() => {
+    wczytajDane().then(ustawDane).catch(() => ustawBlad(true))
+  }, [])
+
+  const wymagaDanych = strona !== "wycena"
   return (
-    <div className="flex min-h-svh p-6">
-      <div className="flex max-w-md min-w-0 flex-col gap-4 text-sm leading-loose">
-        <div>
-          <h1 className="font-medium">Project ready!</h1>
-          <p>You may now add components and start building.</p>
-          <p>We&apos;ve already added the button component for you.</p>
-          <Button className="mt-2">Button</Button>
-        </div>
-        <div className="font-mono text-xs text-muted-foreground">
-          (Press <kbd>d</kbd> to toggle dark mode)
-        </div>
-      </div>
-    </div>
+    <SidebarProvider style={{ "--sidebar-width": "calc(var(--spacing) * 56)", "--header-height": "calc(var(--spacing) * 12)" } as React.CSSProperties}>
+      <AppSidebar strona={strona} variant="inset" />
+      <SidebarInset>
+        <SiteHeader tytul={STRONY.find((s) => s.id === strona)?.tytul ?? ""} />
+        <main className="flex flex-1 flex-col gap-4 p-4 lg:p-6">
+          {wymagaDanych && blad && <p className="text-destructive">Nie udało się wczytać danych. Odśwież stronę.</p>}
+          {wymagaDanych && !blad && !dane && <p className="text-muted-foreground">Wczytuję dane…</p>}
+          {strona === "home" && dane && <Home dane={dane} />}
+          {strona === "auto1" && dane && <Auto1 dane={dane} />}
+          {strona === "wycena" && <Wycena />}
+        </main>
+      </SidebarInset>
+    </SidebarProvider>
   )
 }
 

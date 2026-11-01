@@ -1,51 +1,75 @@
 import * as React from "react"
-import { ArrowDownIcon, ArrowUpIcon } from "lucide-react"
+import { flexRender as renderuj, getCoreRowModel, getPaginationRowModel, useReactTable, type ColumnDef, type PaginationState, type RowSelectionState, type VisibilityState } from "@tanstack/react-table"
+import { ArrowDownIcon, ArrowUpIcon, ChevronLeftIcon, ChevronRightIcon, ColumnsIcon, DownloadIcon, InfoIcon, TriangleAlertIcon, XIcon } from "lucide-react"
+import { toast } from "sonner"
 
+import { FiltrLista, FiltrZakres } from "@/components/filtry"
 import { OknoAuta } from "@/components/okno-auta"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Toggle } from "@/components/ui/toggle"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Wybor } from "@/components/wybor"
 import { useIsMobile } from "@/hooks/use-mobile"
-import { AUCTION_LABELS, endLabel, fmt, FUEL, GEAR, hpLabel, kmLabel, kwota, litersLabel, noteLabel, offersLabel, pasuje, porownaj, przygotuj, regLabel, szukane, type Sort, type Waluta, type Wiersz } from "@/lib/auta"
+import { AUCTION_LABELS, endLabel, hpLabel, kmLabel, kwota, litersLabel, noteLabel, offersLabel, pasuje, pieniadze, porownaj, przygotuj, regLabel, szukane, type Sort, type Waluta, type Wiersz } from "@/lib/auta"
 import type { Dane } from "@/lib/dane"
-import { pobierzExcel } from "@/lib/eksport"
+import { pobierzPaczke } from "@/lib/paczka"
 import { odczytaj, zapisz } from "@/lib/pamiec"
+import { cn } from "@/lib/utils"
 
-const PAGE_SIZE = 300
-const POCZATEK = { onlyOk: false, small: false, noVans: false, noBroken: false, pMin: "", pMax: "", yMin: "", yMax: "", kmMin: "", kmMax: "", offersMin: "", fuel: "", gear: "", auction: "" }
-const SORTS: [string, 1 | -1, string, boolean?][] = [
-  ["rank", -1, "Najlepsza różnica"], ["a", 1, "Cena Auto1 rosnąco"], ["reg", -1, "Najnowszy rocznik"], ["km", 1, "Najmniejszy przebieg"],
-  ["hp", -1, "Największa moc"], ["liters", 1, "Najmniejsza pojemność"], ["bid", -1, "Najwyższe „Licytuj do”", true], ["end", 1, "Najbliższy koniec aukcji", true],
-]
-const VIEWS: [string, string][] = [["24h", "Aukcje 24h"], ["dealer", "Aukcje dealerskie"], ["all", "Wszystkie"]]
+const POCZATEK = { onlyOk: false, small: false, noBroken: false, dostawcze: [] as string[], pMin: "", pMax: "", yMin: "", yMax: "", kmMin: "", kmMax: "", offersMin: [] as string[], fuel: [] as string[], gear: [] as string[], auction: [] as string[] }
+const VIEWS: [string, string][] = [["24h", "Aukcje i zakup"], ["dealer", "Aukcje dealerskie"], ["all", "Wszystkie"]]
+const ROZMIARY: [string, string][] = [["100", "100"], ["300", "300"]]
+const CENY: Record<Waluta, number[]> = {
+  eur: [1000, 2000, 3000, 4000, 5000, 7500, 10000, 12500, 15000, 20000, 25000, 30000, 40000, 50000],
+  pln: [5000, 10000, 15000, 20000, 25000, 35000, 50000, 60000, 75000, 100000, 125000, 150000, 200000, 250000],
+}
+const PRZEBIEGI = Array.from({ length: 12 }, (_, i) => (i + 1) * 25000)
+const OFERTY: [string, string][] = [["1", "co najmniej 1"], ["2", "co najmniej 2"], ["3", "co najmniej 3"], ["4", "co najmniej 4"], ["5", "5"]]
+const TYPY: [string, string][] = [["bez", "Bez dostawczych"], ["tylko", "Tylko dostawcze"]]
+const NAZWY_KOLUMN: Record<string, string> = { reg: "Rocznik", liters: "Poj.", km: "Przebieg", hp: "Moc", fuel: "Paliwo", gear: "Skrzynia", a: "Auto1", o: "Otomoto", d: "Różnica", bid: "Licytuj do", end: "Koniec", offers: "Ofert", link: "Link" }
 const liczba = (s: string) => (s === "" ? null : Number(s))
+const kroki = (lista: number[], etykieta: (n: number) => string) => lista.map((n): [string, string] => [String(n), etykieta(n)])
 
-function Pole({ etykieta, children }: { etykieta: string; children: React.ReactNode }) {
-  return <div className="flex flex-col gap-1"><Label className="text-xs text-muted-foreground">{etykieta}</Label>{children}</div>
+function Opis({ tekst }: { tekst: string }) {
+  return <Tooltip><TooltipTrigger asChild><InfoIcon className="size-3 text-muted-foreground" /></TooltipTrigger><TooltipContent>{tekst}</TooltipContent></Tooltip>
 }
 
-function Zakres({ etykieta, od, do: doo, ustawOd, ustawDo }: { etykieta: string; od: string; do: string; ustawOd: (v: string) => void; ustawDo: (v: string) => void }) {
-  return (
-    <Pole etykieta={etykieta}>
-      <div className="flex gap-1">
-        <Input type="number" inputMode="numeric" placeholder="od" value={od} onChange={(e) => ustawOd(e.target.value)} />
-        <Input type="number" inputMode="numeric" placeholder="do" value={doo} onChange={(e) => ustawDo(e.target.value)} />
-      </div>
-    </Pole>
-  )
+function Niezdatne() {
+  return <Tooltip><TooltipTrigger asChild><TriangleAlertIcon role="img" aria-label="Niezdatne do jazdy" className="ml-1 inline size-4 text-destructive" /></TooltipTrigger><TooltipContent>Niezdatne do jazdy</TooltipContent></Tooltip>
 }
 
 function Roznica({ r, waluta, kurs }: { r: Wiersz; waluta: Waluta; kurs: number }) {
   if (r.d_eur === null) return <span className="text-xs text-muted-foreground">{noteLabel(r.note)}</span>
   const prog = waluta === "pln" && r.t !== null ? r.t * kurs : r.t
-  return <><Badge variant={r.ok ? "default" : "outline"}>{fmt(kwota(r, "d", waluta))}</Badge> <span className="text-xs text-muted-foreground">/ {fmt(prog)}</span></>
+  const kwotaRoznicy = pieniadze(kwota(r, "d", waluta), waluta)
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        {r.ok ? <Badge className="bg-green-600/15 text-green-700 dark:text-green-400">{kwotaRoznicy}</Badge> : <span>{kwotaRoznicy}</span>}
+      </TooltipTrigger>
+      <TooltipContent>Próg: {pieniadze(prog, waluta)}</TooltipContent>
+    </Tooltip>
+  )
+}
+
+function Nazwa({ r, otworz }: { r: Wiersz; otworz: (r: Wiersz) => void }) {
+  return (
+    <HoverCard openDelay={200} closeDelay={0}>
+      <HoverCardTrigger asChild>
+        <button className="inline text-left font-medium hover:underline" onClick={() => otworz(r)}>{r.title || r.id}</button>
+      </HoverCardTrigger>
+      {r.image && <HoverCardContent side="right" className="w-72 p-1"><img src={r.image} alt={r.title} className="rounded-md" /></HoverCardContent>}
+    </HoverCard>
+  )
 }
 
 export function Auto1({ dane }: { dane: Dane }) {
@@ -56,26 +80,29 @@ export function Auto1({ dane }: { dane: Dane }) {
   const [sort, ustawSort] = React.useState<Sort>({ key: "rank", dir: -1 })
   const [f, ustawF] = React.useState(POCZATEK)
   const [tekst, ustawTekst] = React.useState("")
-  const [ile, ustawIle] = React.useState(PAGE_SIZE)
+  const [strona, ustawStrone] = React.useState<PaginationState>({ pageIndex: 0, pageSize: 50 })
   const [otwarte, ustawOtwarte] = React.useState<Wiersz | null>(null)
-  const [zaznaczone, ustawZaznaczone] = React.useState(() => new Set(odczytaj("ar_picked")))
+  const [zaznaczone, ustawZaznaczone] = React.useState<RowSelectionState>(() => Object.fromEntries(odczytaj("ar_picked").map((id) => [id, true])))
   const [widziane, ustawWidziane] = React.useState(() => new Set(odczytaj("ar_seen")))
+  const [ukryte, ustawUkryte] = React.useState<VisibilityState>({})
+  const [postep, ustawPostep] = React.useState<string | null>(null)
 
-  const pole = <K extends keyof typeof POCZATEK>(k: K, v: (typeof POCZATEK)[K]) => { ustawF((s) => ({ ...s, [k]: v })); ustawIle(PAGE_SIZE) }
+  const pierwsza = () => ustawStrone((s) => ({ ...s, pageIndex: 0 }))
+  const pole = <K extends keyof typeof POCZATEK>(k: K, v: (typeof POCZATEK)[K]) => { ustawF((s) => ({ ...s, [k]: v })); pierwsza() }
   const dealerski = widok === "dealer"
   const wWidoku = React.useCallback((r: Wiersz) => widok === "all" || dealerski === r._dealer, [widok, dealerski])
   const s = React.useMemo(() => szukane(tekst), [tekst])
 
   const lista = React.useMemo(() => {
-    const [pMin, pMax, yMin, yMax, kmMin, kmMax, offersMin] = [f.pMin, f.pMax, f.yMin, f.yMax, f.kmMin, f.kmMax, f.offersMin].map(liczba)
+    const [pMin, pMax, yMin, yMax, kmMin, kmMax, offersMin] = [f.pMin, f.pMax, f.yMin, f.yMax, f.kmMin, f.kmMax, f.offersMin[0] ?? ""].map(liczba)
     return auta.filter((r) => wWidoku(r) && (!f.onlyOk || r.ok)
       && (!f.small || r.liters == null || r.liters <= 2)
-      && (pMin === null || (r.a_eur ?? -1) >= pMin) && (pMax === null || (r.a_eur ?? Infinity) <= pMax)
+      && (pMin === null || (kwota(r, "a", waluta) ?? -1) >= pMin) && (pMax === null || (kwota(r, "a", waluta) ?? Infinity) <= pMax)
       && (yMin === null || (r._year !== null && r._year >= yMin)) && (yMax === null || (r._year !== null && r._year <= yMax))
       && (kmMin === null || (r.km != null && r.km >= kmMin)) && (kmMax === null || (r.km != null && r.km <= kmMax))
       && (offersMin === null || (r.compared ?? 0) >= offersMin)
-      && (!f.noVans || r.body !== "commercial") && (!f.noBroken || !r.unroadworthy)
-      && (!f.fuel || r._fuel === f.fuel) && (!f.gear || r._gear === f.gear) && (!f.auction || r._label === f.auction)
+      && (f.dostawcze[0] !== "bez" || r.body !== "commercial") && (f.dostawcze[0] !== "tylko" || r.body === "commercial") && (!f.noBroken || !r.unroadworthy)
+      && (!f.fuel.length || f.fuel.includes(r._fuel)) && (!f.gear.length || f.gear.includes(r._gear)) && (!f.auction.length || f.auction.includes(r._label))
       && pasuje(r, s)).sort((a, b) => porownaj(a, b, sort, waluta))
   }, [auta, wWidoku, f, s, sort, waluta])
 
@@ -84,43 +111,83 @@ export function Auto1({ dane }: { dane: Dane }) {
     const miejsce = (l: string) => (l === "nieznany" ? AUCTION_LABELS.length + 1 : AUCTION_LABELS.includes(l) ? AUCTION_LABELS.indexOf(l) : AUCTION_LABELS.length)
     return [...new Set(auta.filter(wWidoku).map((r) => r._label))].sort((a, b) => miejsce(a) - miejsce(b) || a.localeCompare(b)).map((x): [string, string] => [x, x])
   }, [auta, wWidoku])
+  const lata = React.useMemo(() => [...new Set(auta.map((r) => r._year).filter((x) => x !== null))].sort((a, b) => b - a).map((x): [string, string] => [String(x), String(x)]), [auta])
   // Numer auta, które jest tylko w drugim widoku: filtry mogą je ukrywać, więc tu się nie liczą.
   const drugiWidok = dealerski ? "24h" : "dealer"
   const wDrugim = widok !== "all" && s.id.length >= 3 && !auta.some((r) => wWidoku(r) && pasuje(r, s)) && auta.some((r) => !wWidoku(r) && r._id.includes(s.id))
 
   const zmienWidok = (v: string) => {
     ustawWidok(v)
-    ustawF((x) => ({ ...x, auction: "" }))
+    ustawF((x) => ({ ...x, auction: [] }))
     if (v !== "dealer" && (sort.key === "bid" || sort.key === "end")) ustawSort({ key: "rank", dir: -1 })
-    ustawIle(PAGE_SIZE)
+    pierwsza()
   }
-  const sortuj = (key: string) => ustawSort((x) => ({ key, dir: x.key === key || (x.key === "rank" && key === "d") ? (x.dir === 1 ? -1 : 1) : -1 }))
-  const zaznacz = (id: string, tak: boolean) => ustawZaznaczone((x) => {
-    const n = new Set(x)
-    if (tak) n.add(id); else n.delete(id)
-    zapisz("ar_picked", [...n])
+  const zmienWalute = (v: string) => {
+    if (!v) return
+    ustawWalute(v as Waluta)
+    ustawF((x) => ({ ...x, pMin: "", pMax: "" })) // progi cen różnią się między walutami
+  }
+  const sortuj = (key: string) => { ustawSort((x) => ({ key, dir: x.key === key || (x.key === "rank" && key === "d") ? (x.dir === 1 ? -1 : 1) : -1 })); pierwsza() }
+  const zmienZaznaczenie = (zmiana: React.SetStateAction<RowSelectionState>) => ustawZaznaczone((x) => {
+    const n = typeof zmiana === "function" ? zmiana(x) : zmiana
+    zapisz("ar_picked", Object.keys(n))
     return n
   })
-  const wyczysc = () => { ustawZaznaczone(new Set()); zapisz("ar_picked", []) }
   const widziany = (id: string) => ustawWidziane((x) => {
     const n = new Set(x).add(id)
     zapisz("ar_seen", [...n])
     return n
   })
-  const wybrane = auta.filter((r) => zaznaczone.has(r.id))
-  const widoczne = lista.slice(0, ile)
+  const wybrane = auta.filter((r) => zaznaczone[r.id])
+  const pobierz = async () => {
+    ustawPostep("Pakuję…")
+    const { zdjecia, bledy } = await pobierzPaczke(wybrane, (g, razem) => ustawPostep(`Pobieram zdjęcia ${g}/${razem}`))
+    ustawPostep(null)
+    if (bledy) toast.error(`Nie udało się pobrać ${bledy} z ${zdjecia} zdjęć.`)
+  }
+  const aktywneFiltry = JSON.stringify(f) !== JSON.stringify(POCZATEK) || tekst !== ""
 
-  const Naglowek = ({ klucz, children, prawo }: { klucz: string; children: React.ReactNode; prawo?: boolean }) => {
+  const Naglowek = ({ klucz, children }: { klucz: string; children: React.ReactNode }) => {
     const aktywny = sort.key === klucz || (sort.key === "rank" && klucz === "d")
     return (
-      <TableHead className={prawo ? "text-right" : undefined}>
-        <button className="inline-flex items-center gap-1 font-medium" onClick={() => sortuj(klucz)}>
-          {children}
-          {aktywny && (sort.dir === 1 ? <ArrowUpIcon className="size-3" /> : <ArrowDownIcon className="size-3" />)}
-        </button>
-      </TableHead>
+      <Button variant="ghost" size="sm" className="-ml-2 px-2" onClick={() => sortuj(klucz)}>
+        {children}
+        {aktywny && (sort.dir === 1 ? <ArrowUpIcon /> : <ArrowDownIcon />)}
+      </Button>
     )
   }
+
+  const kolumny = React.useMemo((): ColumnDef<Wiersz>[] => {
+    const zwykla = (id: string, wartosc: (r: Wiersz) => React.ReactNode): ColumnDef<Wiersz> => ({ id, header: () => <Naglowek klucz={id}>{NAZWY_KOLUMN[id]}</Naglowek>, cell: ({ row }) => wartosc(row.original) })
+    return [
+      { id: "wybor", enableHiding: false,
+        header: ({ table }) => <Checkbox aria-label="Zaznacz stronę" checked={table.getIsAllPageRowsSelected() || (table.getIsSomePageRowsSelected() && "indeterminate")} onCheckedChange={(v) => table.toggleAllPageRowsSelected(v === true)} />,
+        cell: ({ row }) => <Checkbox aria-label={`Zaznacz ${row.id}`} checked={row.getIsSelected()} onCheckedChange={(v) => row.toggleSelected(v === true)} /> },
+      { id: "name", enableHiding: false, header: () => <Naglowek klucz="name">Auto</Naglowek>,
+        cell: ({ row: { original: r } }) => (
+          <div className="min-w-44 whitespace-normal">
+            <Nazwa r={r} otworz={ustawOtwarte} />{r.unroadworthy && <Niezdatne />}
+            <div className="text-xs text-muted-foreground">{r.id} · {r._label}</div>
+          </div>
+        ) },
+      zwykla("reg", regLabel), zwykla("liters", litersLabel), zwykla("km", kmLabel), zwykla("hp", hpLabel), zwykla("fuel", (r) => r._fuel), zwykla("gear", (r) => r._gear),
+      { id: "a", header: () => <span className="inline-flex items-center gap-1"><Naglowek klucz="a">Auto1</Naglowek>{dealerski && <Opis tekst="Cena z nocy, na aukcji mogła już wzrosnąć" />}</span>, cell: ({ row }) => pieniadze(kwota(row.original, "a", waluta), waluta) },
+      zwykla("o", (r) => pieniadze(kwota(r, "o", waluta), waluta)),
+      { id: "d", header: () => <span className="inline-flex items-center gap-1"><Naglowek klucz="d">Różnica</Naglowek><Opis tekst="Na zielono: auto spełnia próg" /></span>, cell: ({ row }) => <Roznica r={row.original} waluta={waluta} kurs={dane.meta.rate_value} /> },
+      zwykla("bid", (r) => <span className="font-medium">{pieniadze(kwota(r, "bid", waluta), waluta)}</span>), zwykla("end", endLabel),
+      { id: "offers", header: () => <span className="inline-flex items-center gap-1"><Naglowek klucz="offers">Ofert</Naglowek><Opis tekst="Ile ofert policzono do średniej, z ilu znalezionych" /></span>, cell: ({ row }) => offersLabel(row.original) },
+      { id: "link", header: "Link", cell: ({ row: { original: r } }) => (r.search_url ? <a className="underline" href={r.search_url} target="_blank" rel="noopener" onClick={() => widziany(r.id)}>Otomoto</a> : "—") },
+    ]
+    // Naglowek zmienia się razem z sort.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [waluta, dealerski, sort, dane])
+
+  const tabela = useReactTable({
+    data: lista, columns: kolumny, getRowId: (r) => r.id, getCoreRowModel: getCoreRowModel(), getPaginationRowModel: getPaginationRowModel(),
+    state: { pagination: strona, rowSelection: zaznaczone, columnVisibility: { ...ukryte, ...(dealerski ? {} : { bid: false, end: false }) } },
+    onPaginationChange: ustawStrone, onRowSelectionChange: zmienZaznaczenie, onColumnVisibilityChange: ustawUkryte, autoResetPageIndex: false,
+  })
+  const wiersze = tabela.getRowModel().rows
 
   return (
     <>
@@ -130,116 +197,85 @@ export function Auto1({ dane }: { dane: Dane }) {
         </TabsList>
       </Tabs>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-6">
-        <div className="col-span-2 md:col-span-2"><Pole etykieta="Szukaj"><Input type="search" placeholder="Numer, marka, model" value={tekst} onChange={(e) => { ustawTekst(e.target.value); ustawIle(PAGE_SIZE) }} /></Pole></div>
-        <Pole etykieta="Sortuj">
-          <Wybor value={`${sort.key}:${sort.dir}`} puste="Inne (kolumna)" onChange={(v) => { if (v) { const [key, dir] = v.split(":"); ustawSort({ key, dir: Number(dir) as 1 | -1 }) } }}
-            opcje={SORTS.filter((x) => !x[3] || dealerski).map((x): [string, string] => [`${x[0]}:${x[1]}`, x[2]])} />
-        </Pole>
-        <Pole etykieta="Typ aukcji"><Wybor value={f.auction} onChange={(v) => pole("auction", v)} opcje={typy} /></Pole>
-        <Pole etykieta="Paliwo"><Wybor value={f.fuel} onChange={(v) => pole("fuel", v)} opcje={opcje("_fuel")} /></Pole>
-        <Pole etykieta="Skrzynia"><Wybor value={f.gear} onChange={(v) => pole("gear", v)} opcje={opcje("_gear")} /></Pole>
-        <Zakres etykieta="Cena Auto1 (EUR)" od={f.pMin} do={f.pMax} ustawOd={(v) => pole("pMin", v)} ustawDo={(v) => pole("pMax", v)} />
-        <Zakres etykieta="Rocznik" od={f.yMin} do={f.yMax} ustawOd={(v) => pole("yMin", v)} ustawDo={(v) => pole("yMax", v)} />
-        <Zakres etykieta="Przebieg (km)" od={f.kmMin} do={f.kmMax} ustawOd={(v) => pole("kmMin", v)} ustawDo={(v) => pole("kmMax", v)} />
-        <Pole etykieta="Ofert Otomoto co najmniej"><Input type="number" inputMode="numeric" min={1} max={5} value={f.offersMin} onChange={(e) => pole("offersMin", e.target.value)} /></Pole>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-        {([["onlyOk", "tylko kwalifikujące się"], ["small", "tylko do 2 l"], ["noVans", "bez dostawczych"], ["noBroken", "bez niezdatnych do jazdy"]] as const).map(([k, nazwa]) => (
-          <Label key={k} className="font-normal"><Checkbox checked={f[k]} onCheckedChange={(v) => pole(k, v === true)} />{nazwa}</Label>
-        ))}
-        <div className="ml-auto flex gap-1">
-          <Button size="sm" variant={waluta === "eur" ? "default" : "outline"} onClick={() => ustawWalute("eur")}>EUR</Button>
-          <Button size="sm" variant={waluta === "pln" ? "default" : "outline"} onClick={() => ustawWalute("pln")}>PLN</Button>
-        </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <Input className="h-8 w-full sm:w-64" type="search" placeholder="Numer, marka, model" aria-label="Szukaj" value={tekst} onChange={(e) => { ustawTekst(e.target.value); pierwsza() }} />
+        <FiltrLista tytul="Typ aukcji" opcje={typy} wybrane={f.auction} zmien={(v) => pole("auction", v)} />
+        <FiltrLista tytul="Paliwo" opcje={opcje("_fuel")} wybrane={f.fuel} zmien={(v) => pole("fuel", v)} />
+        <FiltrLista tytul="Skrzynia" opcje={opcje("_gear")} wybrane={f.gear} zmien={(v) => pole("gear", v)} />
+        <FiltrLista tytul="Typ auta" opcje={TYPY} wybrane={f.dostawcze} zmien={(v) => pole("dostawcze", v)} jeden />
+        <FiltrZakres tytul={`Cena Auto1 (${waluta === "eur" ? "€" : "zł"})`} opcje={kroki(CENY[waluta], (n) => pieniadze(n, waluta))} od={f.pMin} do={f.pMax} zmienOd={(v) => pole("pMin", v)} zmienDo={(v) => pole("pMax", v)} />
+        <FiltrZakres tytul="Rocznik" opcje={lata} od={f.yMin} do={f.yMax} zmienOd={(v) => pole("yMin", v)} zmienDo={(v) => pole("yMax", v)} />
+        <FiltrZakres tytul="Przebieg" opcje={kroki(PRZEBIEGI, (n) => `${n / 1000} tys. km`)} od={f.kmMin} do={f.kmMax} zmienOd={(v) => pole("kmMin", v)} zmienDo={(v) => pole("kmMax", v)} />
+        <FiltrLista tytul="Ofert Otomoto" opcje={OFERTY} wybrane={f.offersMin} zmien={(v) => pole("offersMin", v)} jeden />
+        <Toggle variant="outline" size="sm" pressed={f.onlyOk} onPressedChange={(v) => pole("onlyOk", v)}>Kwalifikujące się</Toggle>
+        <Tooltip>
+          <TooltipTrigger asChild><Toggle variant="outline" size="sm" pressed={f.small} onPressedChange={(v) => pole("small", v)}>Do 2 l</Toggle></TooltipTrigger>
+          <TooltipContent>Auta bez podanej pojemności zostają na liście</TooltipContent>
+        </Tooltip>
+        <Toggle variant="outline" size="sm" pressed={f.noBroken} onPressedChange={(v) => pole("noBroken", v)}>Bez niezdatnych</Toggle>
+        {aktywneFiltry && <Button variant="ghost" size="sm" onClick={() => { ustawF(POCZATEK); ustawTekst(""); pierwsza() }}>Wyczyść filtry<XIcon /></Button>}
       </div>
 
       <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
         <span>Pokazano {lista.length} z {auta.length}</span>
         {wDrugim && <Button size="sm" variant="outline" onClick={() => { ustawF(POCZATEK); zmienWidok(drugiWidok) }}>To auto jest w widoku: {VIEWS.find((v) => v[0] === drugiWidok)?.[1]}</Button>}
-        {wybrane.length > 0 && (
-          <span className="ml-auto flex items-center gap-2">
-            Zaznaczone: {wybrane.length}
-            <Button size="sm" onClick={() => pobierzExcel(wybrane)}>Pobierz Excel</Button>
-            <Button size="sm" variant="outline" onClick={wyczysc}>Wyczyść</Button>
-          </span>
-        )}
+        <div className="ml-auto flex items-center gap-2">
+          <ToggleGroup type="single" variant="outline" size="sm" value={waluta} onValueChange={zmienWalute}>
+            <ToggleGroupItem value="eur">EUR</ToggleGroupItem>
+            <ToggleGroupItem value="pln">PLN</ToggleGroupItem>
+          </ToggleGroup>
+          {!wTelefonie && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild><Button variant="outline" size="sm"><ColumnsIcon />Kolumny</Button></DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Pokaż kolumny</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {tabela.getAllColumns().filter((k) => k.getCanHide() && (dealerski || !["bid", "end"].includes(k.id))).map((k) => (
+                  <DropdownMenuCheckboxItem key={k.id} checked={k.getIsVisible()} onCheckedChange={(v) => k.toggleVisibility(v)}>{NAZWY_KOLUMN[k.id]}</DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
       </div>
 
       {wTelefonie ? (
         <div className="flex flex-col gap-3">
-          {widoczne.map((r) => (
+          {wiersze.map(({ original: r }) => (
             <Card key={r.id} className={widziane.has(r.id) ? "opacity-60" : undefined}>
               <CardContent className="flex flex-col gap-2">
                 <div className="flex items-start gap-2">
-                  <Checkbox className="mt-1" aria-label={`Zaznacz ${r.id}`} checked={zaznaczone.has(r.id)} onCheckedChange={(v) => zaznacz(r.id, v === true)} />
-                  <button className="text-left font-medium" onClick={() => ustawOtwarte(r)}>{r.title || r.id}</button>
+                  <Checkbox className="mt-1" aria-label={`Zaznacz ${r.id}`} checked={!!zaznaczone[r.id]} onCheckedChange={(v) => tabela.getRow(r.id).toggleSelected(v === true)} />
+                  <div><button className="text-left font-medium" onClick={() => ustawOtwarte(r)}>{r.title || r.id}</button>{r.unroadworthy && <Niezdatne />}</div>
                 </div>
                 <p className="text-xs text-muted-foreground">{[regLabel(r), kmLabel(r), litersLabel(r), hpLabel(r), r._fuel, r._gear].join(" · ")}</p>
                 <div className="grid grid-cols-3 text-sm">
-                  <span><span className="block text-xs text-muted-foreground">Auto1</span>{fmt(kwota(r, "a", waluta))}</span>
-                  <span><span className="block text-xs text-muted-foreground">Otomoto</span>{fmt(kwota(r, "o", waluta))}</span>
+                  <span><span className="block text-xs text-muted-foreground">Auto1</span>{pieniadze(kwota(r, "a", waluta), waluta)}</span>
+                  <span><span className="block text-xs text-muted-foreground">Otomoto</span>{pieniadze(kwota(r, "o", waluta), waluta)}</span>
                   <span><span className="block text-xs text-muted-foreground">Ofert</span>{offersLabel(r)}</span>
                 </div>
                 <div className="flex items-center justify-between gap-2">
-                  <span><Roznica r={r} waluta={waluta} kurs={dane.meta.rate_value} /></span>
+                  <Roznica r={r} waluta={waluta} kurs={dane.meta.rate_value} />
                   {r.search_url && <a className="text-sm underline" href={r.search_url} target="_blank" rel="noopener" onClick={() => widziany(r.id)}>Otomoto</a>}
                 </div>
-                {r.unroadworthy && <Badge variant="destructive">niezdatne do jazdy</Badge>}
               </CardContent>
             </Card>
           ))}
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border">
+        <div className="rounded-lg border [&>[data-slot=table-container]]:max-h-[calc(100svh-5rem)] [&>[data-slot=table-container]]:overflow-auto">
           <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead />
-                <Naglowek klucz="name">Auto</Naglowek>
-                <Naglowek klucz="reg">Rocznik</Naglowek>
-                <Naglowek klucz="liters" prawo>Pojemność</Naglowek>
-                <Naglowek klucz="km" prawo>Przebieg</Naglowek>
-                <Naglowek klucz="hp" prawo>Moc</Naglowek>
-                <Naglowek klucz="fuel">Paliwo</Naglowek>
-                <Naglowek klucz="gear">Skrzynia</Naglowek>
-                <Naglowek klucz="a" prawo>Auto1</Naglowek>
-                <Naglowek klucz="o" prawo>Otomoto</Naglowek>
-                <Naglowek klucz="d" prawo>Różnica</Naglowek>
-                {dealerski && <Naglowek klucz="bid" prawo>Licytuj do</Naglowek>}
-                {dealerski && <Naglowek klucz="end" prawo>Koniec aukcji</Naglowek>}
-                <Naglowek klucz="offers" prawo>Ofert</Naglowek>
-                <TableHead>Link</TableHead>
-              </TableRow>
+            <TableHeader className="sticky top-0 z-10 bg-background">
+              {tabela.getHeaderGroups().map((g) => (
+                <TableRow key={g.id}>
+                  {g.headers.map((h) => <TableHead key={h.id} className="px-1">{h.isPlaceholder ? null : renderuj(h.column.columnDef.header, h.getContext())}</TableHead>)}
+                </TableRow>
+              ))}
             </TableHeader>
             <TableBody>
-              {widoczne.map((r) => (
-                <TableRow key={r.id} className={widziane.has(r.id) ? "opacity-60" : undefined} data-state={zaznaczone.has(r.id) ? "selected" : undefined}>
-                  <TableCell><Checkbox aria-label={`Zaznacz ${r.id}`} checked={zaznaczone.has(r.id)} onCheckedChange={(v) => zaznacz(r.id, v === true)} /></TableCell>
-                  <TableCell className="max-w-72 whitespace-normal">
-                    <HoverCard openDelay={200} closeDelay={0}>
-                      <HoverCardTrigger asChild>
-                        <button className="text-left font-medium hover:underline" onClick={() => ustawOtwarte(r)}>{r.title || r.id}</button>
-                      </HoverCardTrigger>
-                      {r.image && <HoverCardContent side="right" className="w-72 p-1"><img src={r.image} alt={r.title} className="rounded-md" /></HoverCardContent>}
-                    </HoverCard>
-                    {r.unroadworthy && <Badge variant="destructive" className="ml-1">niezdatne</Badge>}
-                    <div className="text-xs text-muted-foreground">{r.id} · {r._label}</div>
-                  </TableCell>
-                  <TableCell>{regLabel(r)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{litersLabel(r)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{kmLabel(r)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{hpLabel(r)}</TableCell>
-                  <TableCell>{(r.fuel && FUEL[r.fuel]) || r.fuel || "—"}</TableCell>
-                  <TableCell>{(r.gear && GEAR[r.gear]) || r.gear || "—"}</TableCell>
-                  <TableCell className="text-right tabular-nums">{fmt(kwota(r, "a", waluta))}{r._dealer && <div className="text-xs text-muted-foreground">cena z nocy</div>}</TableCell>
-                  <TableCell className="text-right tabular-nums">{fmt(kwota(r, "o", waluta))}</TableCell>
-                  <TableCell className="max-w-44 text-right whitespace-normal tabular-nums"><Roznica r={r} waluta={waluta} kurs={dane.meta.rate_value} /></TableCell>
-                  {dealerski && <TableCell className="text-right font-medium tabular-nums">{fmt(kwota(r, "bid", waluta))}</TableCell>}
-                  {dealerski && <TableCell className="text-right tabular-nums">{endLabel(r)}</TableCell>}
-                  <TableCell className="text-right tabular-nums">{offersLabel(r)}</TableCell>
-                  <TableCell>{r.search_url ? <a className="underline" href={r.search_url} target="_blank" rel="noopener" onClick={() => widziany(r.id)}>Otomoto</a> : "—"}</TableCell>
+              {wiersze.map((w) => (
+                <TableRow key={w.id} className={cn(widziane.has(w.id) && "opacity-60", w.original.ok && "bg-green-600/5")} data-state={w.getIsSelected() ? "selected" : undefined}>
+                  {w.getVisibleCells().map((c) => <TableCell key={c.id} className="px-1 tabular-nums">{renderuj(c.column.columnDef.cell, c.getContext())}</TableCell>)}
                 </TableRow>
               ))}
             </TableBody>
@@ -247,7 +283,26 @@ export function Auto1({ dane }: { dane: Dane }) {
         </div>
       )}
       {lista.length === 0 && <p className="text-muted-foreground">Brak aut dla tych filtrów.</p>}
-      {ile < lista.length && <Button variant="outline" onClick={() => ustawIle(ile + PAGE_SIZE)}>Pokaż kolejne {Math.min(PAGE_SIZE, lista.length - ile)} (na liście {ile} z {lista.length})</Button>}
+
+      <div className="flex flex-wrap items-center justify-end gap-2 text-sm">
+        <span className="text-muted-foreground">Na stronie</span>
+        <Wybor className="h-8 w-20" value={strona.pageSize === 50 ? "" : String(strona.pageSize)} opcje={ROZMIARY} puste="50" onChange={(v) => { tabela.setPageSize(Number(v || 50)); pierwsza() }} />
+        <span className="text-muted-foreground">Strona {strona.pageIndex + 1} z {tabela.getPageCount() || 1}</span>
+        <Button variant="outline" size="icon-sm" aria-label="Poprzednia strona" disabled={!tabela.getCanPreviousPage()} onClick={() => tabela.previousPage()}><ChevronLeftIcon /></Button>
+        <Button variant="outline" size="icon-sm" aria-label="Następna strona" disabled={!tabela.getCanNextPage()} onClick={() => tabela.nextPage()}><ChevronRightIcon /></Button>
+      </div>
+
+      {wybrane.length > 0 && (
+        <Card className="sticky bottom-4 z-20 py-2 shadow-lg">
+          <CardContent className="flex flex-wrap items-center gap-2 text-sm">
+            Zaznaczone: {wybrane.length}
+            <span className="ml-auto flex gap-2">
+              <Button size="sm" disabled={postep !== null} onClick={pobierz}><DownloadIcon />{postep ?? "Pobierz paczkę"}</Button>
+              <Button size="sm" variant="outline" onClick={() => zmienZaznaczenie({})}>Wyczyść</Button>
+            </span>
+          </CardContent>
+        </Card>
+      )}
       <OknoAuta auto={otwarte} waluta={waluta} zamknij={() => ustawOtwarte(null)} />
     </>
   )

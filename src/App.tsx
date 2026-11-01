@@ -27,18 +27,21 @@ export function App() {
     wczytajDane().then(ustawDane).catch(() => ustawBlad(true))
   }, [])
 
+  const [odwiedzone, ustawOdwiedzone] = React.useState(() => new Set([strona]))
+  if (!odwiedzone.has(strona)) ustawOdwiedzone(new Set(odwiedzone).add(strona))
   const wymagaDanych = strona !== "wycena"
   return (
     <SidebarProvider style={{ "--sidebar-width": "calc(var(--spacing) * 56)", "--header-height": "calc(var(--spacing) * 12)" } as React.CSSProperties}>
       <AppSidebar strona={strona} variant="inset" />
-      <SidebarInset>
+      <SidebarInset className="min-w-0">
         <SiteHeader tytul={STRONY.find((s) => s.id === strona)?.tytul ?? ""} />
-        <main className="flex flex-1 flex-col gap-4 p-4 lg:p-6">
+        <main className="flex min-w-0 flex-1 flex-col gap-4 p-4 lg:p-6">
           {wymagaDanych && blad && <p className="text-destructive">Nie udało się wczytać danych. Odśwież stronę.</p>}
           {wymagaDanych && !blad && !dane && <p className="text-muted-foreground">Wczytuję dane…</p>}
           {strona === "home" && dane && <Home dane={dane} />}
-          {strona === "auto1" && dane && <Auto1 dane={dane} />}
-          {strona === "wycena" && <Wycena />}
+          {/* Auto1 i Wycena zostają w pamięci, żeby filtry i wpisane dane przetrwały przejście między stronami. */}
+          {dane && odwiedzone.has("auto1") && <div className={strona === "auto1" ? "flex min-w-0 flex-1 flex-col gap-4" : "hidden"}><Auto1 dane={dane} /></div>}
+          {odwiedzone.has("wycena") && <div className={strona === "wycena" ? "contents" : "hidden"}><Wycena /></div>}
         </main>
       </SidebarInset>
     </SidebarProvider>

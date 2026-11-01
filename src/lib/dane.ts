@@ -31,6 +31,24 @@ export type Auto = {
   ok: boolean
 }
 
+// Zdjęcia i wyposażenie z pliku szczegoly.json, pobieranego dopiero przy pierwszym otwarciu auta.
+export type Szczegoly = {
+  images: string[]
+  report?: string
+  colour?: string | number
+  doors?: string | number
+  emissionStandard?: string | number
+  allWheelDrive?: boolean
+  ac?: boolean
+  backupCamera?: boolean
+  heatedSeats?: boolean
+  leather?: boolean
+  navigationSystem?: boolean
+  parkHeating?: boolean
+  pdc?: boolean
+  sunroof?: boolean
+}
+
 export type Noc = {
   day: string
   status: string | null
@@ -63,4 +81,16 @@ export async function wczytajDane(): Promise<Dane> {
   const odpowiedz = await fetch(ADRES, { cache: "no-cache" })
   if (!odpowiedz.ok) throw new Error(String(odpowiedz.status))
   return odpowiedz.json()
+}
+
+const ADRES_SZCZEGOLOW = ADRES.replace("data.json", "szczegoly.json")
+let szczegoly: Promise<Record<string, Szczegoly>> | null = null
+
+// Bez pliku (noc sprzed zmiany, błąd sieci) auto ma tylko pierwsze zdjęcie z głównych danych.
+export function wczytajSzczegoly() {
+  szczegoly ??= fetch(ADRES_SZCZEGOLOW, { cache: "no-cache" }).then((o) => (o.ok ? o.json() : {})).catch(() => {
+    szczegoly = null
+    return {}
+  })
+  return szczegoly
 }

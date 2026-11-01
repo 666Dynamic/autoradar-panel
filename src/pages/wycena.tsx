@@ -1,7 +1,7 @@
 import * as React from "react"
 
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -58,6 +58,15 @@ function Liczba({ etykieta, value, onChange }: { etykieta: string; value: string
   )
 }
 
+const OSTATNI_ROK = new Date().getFullYear() + 1
+const LATA = Array.from({ length: OSTATNI_ROK - 1979 }, (_, i) => String(OSTATNI_ROK - i))
+
+function Rok({ etykieta, value, onChange }: { etykieta: string; value: string; onChange: (v: string) => void }) {
+  // Rok spoza listy (z wklejonego tekstu) też ma być widoczny.
+  const lata = value && !LATA.includes(value) ? [value, ...LATA] : LATA
+  return <div className="flex flex-col gap-1"><Label>{etykieta}</Label><Wybor puste="—" value={value} opcje={lata.map((r): [string, string] => [r, r])} onChange={onChange} /></div>
+}
+
 export function Wycena() {
   const [tekst, ustawTekst] = React.useState("")
   const [p, ustawP] = React.useState(PUSTE)
@@ -86,9 +95,9 @@ export function Wycena() {
   }
 
   return (
-    <Card className="w-full max-w-xl">
-      <CardContent>
-        <form className="flex flex-col gap-4" onSubmit={wyszukaj}>
+    <form className="grid items-start gap-4 lg:grid-cols-2" onSubmit={wyszukaj}>
+      <Card>
+        <CardContent className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
             <Label htmlFor="tekst">Wklej albo wpisz auto</Label>
             <Textarea id="tekst" rows={3} value={tekst} onChange={(e) => wczytaj(e.target.value)} />
@@ -98,18 +107,22 @@ export function Wycena() {
             <div className="flex flex-col gap-1"><Label>Model</Label><Wybor puste="—" value={p.model} opcje={modele(p.marka)} onChange={(v) => zmien({ model: v })} /></div>
             <div className="flex flex-col gap-1"><Label>Paliwo</Label><Wybor puste="—" value={p.paliwo} opcje={PALIWA} onChange={(v) => zmien({ paliwo: v })} /></div>
             <div className="flex flex-col gap-1"><Label>Skrzynia</Label><Wybor puste="—" value={p.skrzynia} opcje={SKRZYNIE} onChange={(v) => zmien({ skrzynia: v })} /></div>
-            <Liczba etykieta="Rok" value={p.rok} onChange={(v) => zmienAuto("rok", v)} />
+            <Rok etykieta="Rok" value={p.rok} onChange={(v) => zmienAuto("rok", v)} />
             <Liczba etykieta="Moc (KM)" value={p.moc} onChange={(v) => zmienAuto("moc", v)} />
             <div className="col-span-2"><Liczba etykieta="Przebieg (km)" value={p.przebieg} onChange={(v) => zmienAuto("przebieg", v)} /></div>
           </div>
-          <fieldset className="grid grid-cols-2 gap-3 rounded-lg border p-3">
-            <legend className="px-1 text-sm text-muted-foreground">Filtr (możesz zmienić)</legend>
-            <Liczba etykieta="Rok od" value={p.rokOd} onChange={(v) => zmien({ rokOd: v })} />
-            <Liczba etykieta="Rok do" value={p.rokDo} onChange={(v) => zmien({ rokDo: v })} />
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader><CardTitle>Filtr (możesz zmienić)</CardTitle></CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <div className="grid grid-cols-2 gap-3">
+            <Rok etykieta="Rok od" value={p.rokOd} onChange={(v) => zmien({ rokOd: v })} />
+            <Rok etykieta="Rok do" value={p.rokDo} onChange={(v) => zmien({ rokDo: v })} />
             <Liczba etykieta="Moc od" value={p.mocOd} onChange={(v) => zmien({ mocOd: v })} />
             <Liczba etykieta="Moc do" value={p.mocDo} onChange={(v) => zmien({ mocDo: v })} />
             <div className="col-span-2"><Liczba etykieta="Przebieg do" value={p.przebiegDo} onChange={(v) => zmien({ przebiegDo: v })} /></div>
-          </fieldset>
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <Button type="submit">Wyszukaj</Button>
             <Button asChild={!!filtry} variant="outline" disabled={!filtry}>
@@ -117,8 +130,8 @@ export function Wycena() {
             </Button>
           </div>
           {wynik && <p role="status" className="whitespace-pre-line text-lg">{wynik}</p>}
-        </form>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </form>
   )
 }

@@ -1,4 +1,4 @@
-import type { Auto } from "@/lib/dane"
+import type { Auto, Szczegoly } from "@/lib/dane"
 
 export const FUEL: Record<string, string> = { diesel: "diesel", petrol: "benzyna", hybrid: "hybryda", electro: "elektryczny", gas: "gaz", other: "inne" }
 export const GEAR: Record<string, string> = { manual: "manualna", automatic: "automat", duplex: "automat", "semi-automatic": "automat" }
@@ -6,7 +6,7 @@ export const GEAR: Record<string, string> = { manual: "manualna", automatic: "au
 const AUCTION = new Map([
   ["24D1", "Aukcja 24h"], ["24D2", "Aukcja 24h"], ["24D3", "Aukcja 24h"], ["ZRT24D1", "Aukcja 24h"],
   ["LASTRUN", "Ostatnia szansa"], ["INSTANTPURCHASE", "Zakup natychmiastowy"],
-  ["3RD_PARTY_BIDDING", "Aukcja dealerska"], ["3RD_PARTY_PREBID", "Dealerska (3RD_PARTY_PREBID)"], ["REMA_PREBIDDING", "Dealerska (REMA_PREBIDDING)"],
+  ["3RD_PARTY_BIDDING", "Aukcja dealerska"], ["3RD_PARTY_PREBID", "Dealerska zewnętrzna"], ["REMA_PREBIDDING", "Dealerska REMA"],
 ])
 export const AUCTION_LABELS = [...new Set(AUCTION.values())]
 
@@ -51,7 +51,7 @@ export function pasuje(r: Wiersz, s: Szukane) {
 export const fmt = (n: number | null | undefined) => (n === null || n === undefined ? "—" : Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, "."))
 export const regLabel = (r: Auto) => (r.reg ? r.reg.slice(5, 7) + "." + r.reg.slice(0, 4) : "—")
 export const kmLabel = (r: Auto) => (r.km != null ? fmt(r.km) + " km" : "—")
-export const litersLabel = (r: Auto) => (r.liters != null ? r.liters.toFixed(1) + " l" : "—")
+export const litersLabel = (r: Auto) => (r.liters != null ? r.liters.toFixed(1).replace(".", ",") + " l" : "—")
 export const hpLabel = (r: Auto) => (r.hp != null ? r.hp + " KM" : "—")
 export const offersLabel = (r: Auto) => (r.total == null ? "—" : `${r.compared ?? "—"} z ${r.total}`)
 
@@ -73,6 +73,7 @@ export function noteLabel(n: string | null) {
 
 export type Waluta = "eur" | "pln"
 export const kwota = (r: Auto, pole: "a" | "o" | "d" | "bid", w: Waluta) => r[`${pole}_${w}`]
+export const pieniadze = (n: number | null | undefined, w: Waluta) => (n === null || n === undefined ? "—" : `${fmt(n)} ${w === "eur" ? "€" : "zł"}`)
 
 export type Sort = { key: string; dir: 1 | -1 }
 
@@ -115,11 +116,28 @@ const specyfikacja = (r: Auto) => [
 
 export const specyfikacjaAuta = specyfikacja
 
-// Teksty bez ceny zakupu i bez linku do Auto1.
-export function tekstWhatsApp(r: Auto) {
-  return [r.title, ...specyfikacja(r).filter(([, v]) => v !== "—").map(([k, v]) => `${k}: ${v}`)].join("\n")
+const WYPOSAZENIE: [keyof Szczegoly, string][] = [
+  ["allWheelDrive", "napęd 4x4"], ["ac", "klimatyzacja"], ["navigationSystem", "nawigacja"], ["leather", "skórzana tapicerka"],
+  ["heatedSeats", "podgrzewane fotele"], ["backupCamera", "kamera cofania"], ["pdc", "czujniki parkowania"],
+  ["sunroof", "szyberdach"], ["parkHeating", "ogrzewanie postojowe"],
+]
+
+export function wyposazenie(s?: Szczegoly) {
+  return s ? WYPOSAZENIE.filter(([k]) => s[k] === true).map(([, nazwa]) => nazwa) : []
 }
 
-export function tekstFacebook(r: Auto) {
-  return [`🚗 ${r.title}`, "", ...specyfikacja(r).filter(([, v]) => v !== "—").map(([k, v]) => `✅ ${k}: ${v}`), "", "Zainteresowany? Napisz wiadomość."].join("\n")
+const dodatki = (s?: Szczegoly) => [
+  ...(s?.doors ? [["Drzwi", String(s.doors)]] : []),
+  ...(typeof s?.emissionStandard === "string" ? [["Norma emisji", s.emissionStandard]] : []),
+]
+
+// Teksty bez ceny zakupu i bez linku do Auto1.
+export function tekstWhatsApp(r: Auto, s?: Szczegoly) {
+  const sprzet = wyposazenie(s)
+  return [r.title, ...[...specyfikacja(r), ...dodatki(s)].filter(([, v]) => v !== "—").map(([k, v]) => `${k}: ${v}`), ...(sprzet.length ? [`Wyposażenie: ${sprzet.join(", ")}`] : [])].join("\n")
+}
+
+export function tekstFacebook(r: Auto, s?: Szczegoly) {
+  const sprzet = wyposazenie(s)
+  return [`🚗 ${r.title}`, "", ...[...specyfikacja(r), ...dodatki(s)].filter(([, v]) => v !== "—").map(([k, v]) => `✅ ${k}: ${v}`), ...sprzet.map((x) => `✅ ${x}`), "", "Zainteresowany? Napisz wiadomość."].join("\n")
 }

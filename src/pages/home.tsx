@@ -8,6 +8,7 @@ import type { Dane, Noc } from "@/lib/dane"
 const STALE_HOURS = 26
 const STATUS: Record<string, string> = { done: "udany", blocked_no_publish: "zablokowany", failed_no_publish: "błąd" }
 
+const dzien = (d: string) => d.split("-").reverse().join(".")
 const czas = (iso: string | null) => (iso ? new Date(iso).toLocaleString("pl-PL", { dateStyle: "short", timeStyle: "short" }) : "—")
 
 function dlugosc(start: string | null, koniec: string | null) {
@@ -22,7 +23,8 @@ function Status({ noc }: { noc: Noc }) {
 }
 
 export function Home({ dane }: { dane: Dane }) {
-  const { scan, meta, nights } = dane
+  const { scan, meta, nights, rows } = dane
+  const zBledem = rows.filter((r) => r.note?.startsWith("error:"))
   const wiek = (Date.now() - Date.parse(meta.stamp_iso)) / 3600000
   const kafelki: [string, string][] = [
     ["Ostatni skan", czas(meta.stamp_iso)],
@@ -51,6 +53,7 @@ export function Home({ dane }: { dane: Dane }) {
           </Card>
         ))}
       </div>
+      {zBledem.length > 0 && <p className="text-sm text-muted-foreground">Auta z błędem pobrania z Otomoto: {zBledem.map((r) => `${r.title} (${r.id})`).join(", ")}</p>}
       <div className="overflow-x-auto rounded-lg border">
         <Table>
           <TableHeader>
@@ -66,7 +69,7 @@ export function Home({ dane }: { dane: Dane }) {
           <TableBody>
             {nights.map((n) => (
               <TableRow key={n.day}>
-                <TableCell>{n.day}</TableCell>
+                <TableCell>{dzien(n.day)}</TableCell>
                 <TableCell><Status noc={n} /></TableCell>
                 <TableCell className="text-right tabular-nums">{fmt(n.cars)}</TableCell>
                 <TableCell className="text-right tabular-nums">{fmt(n.compared)}</TableCell>

@@ -54,7 +54,7 @@ function Roznica({ r, waluta, kurs }: { r: Wiersz; waluta: Waluta; kurs: number 
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        {r.ok ? <Badge className="bg-green-600/15 text-green-700 dark:text-green-400">{kwotaRoznicy}</Badge> : <span>{kwotaRoznicy}</span>}
+        {r.ok ? <Badge className="bg-success/15 text-success">{kwotaRoznicy}</Badge> : <span>{kwotaRoznicy}</span>}
       </TooltipTrigger>
       <TooltipContent>Próg: {pieniadze(prog, waluta)}</TooltipContent>
     </Tooltip>
@@ -72,8 +72,48 @@ function Nazwa({ r, otworz }: { r: Wiersz; otworz: (r: Wiersz) => void }) {
   )
 }
 
+// Sortowanie idzie przez kontekst: kolumny tworzone raz nie przebudowują tabeli i przycisk nie gubi fokusu.
+const Sortowanie = React.createContext<{ sort: Sort; sortuj: (key: string) => void }>({ sort: { key: "rank", dir: -1 }, sortuj: () => {} })
+
+function Naglowek({ klucz, children }: { klucz: string; children: React.ReactNode }) {
+  const { sort, sortuj } = React.useContext(Sortowanie)
+  const aktywny = sort.key === klucz || (sort.key === "rank" && klucz === "d")
+  return (
+    <Button variant="ghost" size="sm" className="-ml-2 px-2" onClick={() => sortuj(klucz)}>
+      {children}
+      {aktywny && (sort.dir === 1 ? <ArrowUpIcon /> : <ArrowDownIcon />)}
+    </Button>
+  )
+}
+
+function PasekPaczki({ wybrane, wyczysc }: { wybrane: Wiersz[]; wyczysc: () => void }) {
+  const [postep, ustawPostep] = React.useState<string | null>(null)
+  const pobierz = async () => {
+    ustawPostep("Pakuję…")
+    try {
+      const { zdjecia, bledy } = await pobierzPaczke(wybrane, (g, razem) => ustawPostep(`Pobieram zdjęcia ${g}/${razem}`))
+      if (bledy) toast.error(`Nie udało się pobrać ${bledy} z ${zdjecia} zdjęć.`)
+    } catch {
+      toast.error("Nie udało się przygotować paczki.")
+    } finally {
+      ustawPostep(null)
+    }
+  }
+  return (
+    <Card className="sticky bottom-4 z-20 py-2 shadow-lg">
+      <CardContent className="flex flex-wrap items-center gap-2 text-sm">
+        Zaznaczone: {wybrane.length}
+        <span className="ml-auto flex gap-2">
+          <Button size="sm" disabled={postep !== null} onClick={pobierz}><DownloadIcon />{postep ?? "Pobierz paczkę"}</Button>
+          <Button size="sm" variant="outline" onClick={wyczysc}>Wyczyść</Button>
+        </span>
+      </CardContent>
+    </Card>
+  )
+}
+
 export function Auto1({ dane }: { dane: Dane }) {
-  const auta = React.useMemo(() => przygotuj(dane.rows), [dane])
+  const auta =React.useMemo(() => przygotuj(dane.rows), [dane])
   const wTelefonie = useIsMobile()
   const [widok, ustawWidok] = React.useState("24h")
   const [waluta, ustawWalute] = React.useState<Waluta>("eur")
@@ -85,13 +125,14 @@ export function Auto1({ dane }: { dane: Dane }) {
   const [zaznaczone, ustawZaznaczone] = React.useState<RowSelectionState>(() => Object.fromEntries(odczytaj("ar_picked").map((id) => [id, true])))
   const [widziane, ustawWidziane] = React.useState(() => new Set(odczytaj("ar_seen")))
   const [ukryte, ustawUkryte] = React.useState<VisibilityState>({})
-  const [postep, ustawPostep] = React.useState<string | null>(null)
+  const poczatekListy = React.useRef<HTMLDivElement>(null)
 
-  const pierwsza = () => ustawStrone((s) => ({ ...s, pageIndex: 0 }))
+  const pierwsza =() => ustawStrone((s) => ({ ...s, pageIndex: 0 }))
   const pole = <K extends keyof typeof POCZATEK>(k: K, v: (typeof POCZATEK)[K]) => { ustawF((s) => ({ ...s, [k]: v })); pierwsza() }
   const dealerski = widok === "dealer"
   const wWidoku = React.useCallback((r: Wiersz) => widok === "all" || dealerski === r._dealer, [widok, dealerski])
-  const s = React.useMemo(() => szukane(tekst), [tekst])
+  const odroczonyTekst = React.useDeferredValue(tekst) // przy 300 wierszach pisanie nie czeka na tabelę
+  const s = React.useMemo(() => szukane(odroczonyTekst), [odroczonyTekst])
 
   const lista = React.useMemo(() => {
     const [pMin, pMax, yMin, yMax, kmMin, kmMax, offersMin] = [f.pMin, f.pMax, f.yMin, f.yMax, f.kmMin, f.kmMax, f.offersMin[0] ?? ""].map(liczba)
@@ -127,7 +168,10 @@ export function Auto1({ dane }: { dane: Dane }) {
     ustawWalute(v as Waluta)
     ustawF((x) => ({ ...x, pMin: "", pMax: "" })) // progi cen różnią się między walutami
   }
-  const sortuj = (key: string) => { ustawSort((x) => ({ key, dir: x.key === key || (x.key === "rank" && key === "d") ? (x.dir === 1 ? -1 : 1) : -1 })); pierwsza() }
+  const sortowanie = React.useMemo(() => ({
+    sort,
+    sortuj: (key: string) => { ustawSort((x) => ({ key, dir: x.key === key || (x.key === "rank" && key === "d") ? (x.dir === 1 ? -1 : 1) : -1 })); ustawStrone((x) => ({ ...x, pageIndex: 0 })) },
+  }), [sort])
   const zmienZaznaczenie = (zmiana: React.SetStateAction<RowSelectionState>) => ustawZaznaczone((x) => {
     const n = typeof zmiana === "function" ? zmiana(x) : zmiana
     zapisz("ar_picked", Object.keys(n))
@@ -139,22 +183,11 @@ export function Auto1({ dane }: { dane: Dane }) {
     return n
   })
   const wybrane = auta.filter((r) => zaznaczone[r.id])
-  const pobierz = async () => {
-    ustawPostep("Pakuję…")
-    const { zdjecia, bledy } = await pobierzPaczke(wybrane, (g, razem) => ustawPostep(`Pobieram zdjęcia ${g}/${razem}`))
-    ustawPostep(null)
-    if (bledy) toast.error(`Nie udało się pobrać ${bledy} z ${zdjecia} zdjęć.`)
-  }
   const aktywneFiltry = JSON.stringify(f) !== JSON.stringify(POCZATEK) || tekst !== ""
-
-  const Naglowek = ({ klucz, children }: { klucz: string; children: React.ReactNode }) => {
-    const aktywny = sort.key === klucz || (sort.key === "rank" && klucz === "d")
-    return (
-      <Button variant="ghost" size="sm" className="-ml-2 px-2" onClick={() => sortuj(klucz)}>
-        {children}
-        {aktywny && (sort.dir === 1 ? <ArrowUpIcon /> : <ArrowDownIcon />)}
-      </Button>
-    )
+  const zmienStrone = (krok: number) => {
+    tabela.setPageIndex((i) => i + krok)
+    poczatekListy.current?.querySelector("[data-slot=table-container]")?.scrollTo(0, 0)
+    poczatekListy.current?.scrollIntoView({ block: "start" })
   }
 
   const kolumny = React.useMemo((): ColumnDef<Wiersz>[] => {
@@ -178,9 +211,7 @@ export function Auto1({ dane }: { dane: Dane }) {
       { id: "offers", header: () => <span className="inline-flex items-center gap-1"><Naglowek klucz="offers">Ofert</Naglowek><Opis tekst="Ile ofert policzono do średniej, z ilu znalezionych" /></span>, cell: ({ row }) => offersLabel(row.original) },
       { id: "link", header: "Link", cell: ({ row: { original: r } }) => (r.search_url ? <a className="underline" href={r.search_url} target="_blank" rel="noopener" onClick={() => widziany(r.id)}>Otomoto</a> : "—") },
     ]
-    // Naglowek zmienia się razem z sort.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [waluta, dealerski, sort, dane])
+  }, [waluta, dealerski, dane])
 
   const tabela = useReactTable({
     data: lista, columns: kolumny, getRowId: (r) => r.id, getCoreRowModel: getCoreRowModel(), getPaginationRowModel: getPaginationRowModel(),
@@ -198,7 +229,7 @@ export function Auto1({ dane }: { dane: Dane }) {
       </Tabs>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Input className="h-8 w-full sm:w-64" type="search" placeholder="Numer, marka, model" aria-label="Szukaj" value={tekst} onChange={(e) => { ustawTekst(e.target.value); pierwsza() }} />
+        <Input className="h-7 w-full sm:w-64" type="search" placeholder="Numer, marka, model" aria-label="Szukaj" value={tekst} onChange={(e) => { ustawTekst(e.target.value); pierwsza() }} />
         <FiltrLista tytul="Typ aukcji" opcje={typy} wybrane={f.auction} zmien={(v) => pole("auction", v)} />
         <FiltrLista tytul="Paliwo" opcje={opcje("_fuel")} wybrane={f.fuel} zmien={(v) => pole("fuel", v)} />
         <FiltrLista tytul="Skrzynia" opcje={opcje("_gear")} wybrane={f.gear} zmien={(v) => pole("gear", v)} />
@@ -240,7 +271,7 @@ export function Auto1({ dane }: { dane: Dane }) {
       </div>
 
       {wTelefonie ? (
-        <div className="flex flex-col gap-3">
+        <div ref={poczatekListy} className="flex scroll-mt-16 flex-col gap-3">
           {wiersze.map(({ original: r }) => (
             <Card key={r.id} className={widziane.has(r.id) ? "opacity-60" : undefined}>
               <CardContent className="flex flex-col gap-2">
@@ -249,10 +280,12 @@ export function Auto1({ dane }: { dane: Dane }) {
                   <div><button className="text-left font-medium" onClick={() => ustawOtwarte(r)}>{r.title || r.id}</button>{r.unroadworthy && <Niezdatne />}</div>
                 </div>
                 <p className="text-xs text-muted-foreground">{[regLabel(r), kmLabel(r), litersLabel(r), hpLabel(r), r._fuel, r._gear].join(" · ")}</p>
-                <div className="grid grid-cols-3 text-sm">
+                <div className="grid grid-cols-3 gap-y-2 text-sm">
                   <span><span className="block text-xs text-muted-foreground">Auto1</span>{pieniadze(kwota(r, "a", waluta), waluta)}</span>
                   <span><span className="block text-xs text-muted-foreground">Otomoto</span>{pieniadze(kwota(r, "o", waluta), waluta)}</span>
                   <span><span className="block text-xs text-muted-foreground">Ofert</span>{offersLabel(r)}</span>
+                  {dealerski && <span><span className="block text-xs text-muted-foreground">Licytuj do</span>{pieniadze(kwota(r, "bid", waluta), waluta)}</span>}
+                  {dealerski && <span className="col-span-2"><span className="block text-xs text-muted-foreground">Koniec</span>{endLabel(r)}</span>}
                 </div>
                 <div className="flex items-center justify-between gap-2">
                   <Roznica r={r} waluta={waluta} kurs={dane.meta.rate_value} />
@@ -263,47 +296,40 @@ export function Auto1({ dane }: { dane: Dane }) {
           ))}
         </div>
       ) : (
-        <div className="rounded-lg border [&>[data-slot=table-container]]:max-h-[calc(100svh-5rem)] [&>[data-slot=table-container]]:overflow-auto">
-          <Table>
-            <TableHeader className="sticky top-0 z-10 bg-background">
-              {tabela.getHeaderGroups().map((g) => (
-                <TableRow key={g.id}>
-                  {g.headers.map((h) => <TableHead key={h.id} className="px-1">{h.isPlaceholder ? null : renderuj(h.column.columnDef.header, h.getContext())}</TableHead>)}
-                </TableRow>
-              ))}
-            </TableHeader>
-            <TableBody>
-              {wiersze.map((w) => (
-                <TableRow key={w.id} className={cn(widziane.has(w.id) && "opacity-60", w.original.ok && "bg-green-600/5")} data-state={w.getIsSelected() ? "selected" : undefined}>
-                  {w.getVisibleCells().map((c) => <TableCell key={c.id} className="px-1 tabular-nums">{renderuj(c.column.columnDef.cell, c.getContext())}</TableCell>)}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+        <div ref={poczatekListy} className="scroll-mt-16 rounded-lg border [&>[data-slot=table-container]]:max-h-[calc(100svh-5rem)] [&>[data-slot=table-container]]:overflow-auto">
+          <Sortowanie.Provider value={sortowanie}>
+            <Table>
+              <TableHeader className="sticky top-0 z-10 bg-background">
+                {tabela.getHeaderGroups().map((g) => (
+                  <TableRow key={g.id}>
+                    {g.headers.map((h) => <TableHead key={h.id} className="px-1">{h.isPlaceholder ? null : renderuj(h.column.columnDef.header, h.getContext())}</TableHead>)}
+                  </TableRow>
+                ))}
+              </TableHeader>
+              <TableBody>
+                {wiersze.map((w) => (
+                  <TableRow key={w.id} className={cn(widziane.has(w.id) && "opacity-60", w.original.ok && "bg-success/5")} data-state={w.getIsSelected() ? "selected" : undefined}>
+                    {w.getVisibleCells().map((c) => <TableCell key={c.id} className="px-1 tabular-nums">{renderuj(c.column.columnDef.cell, c.getContext())}</TableCell>)}
+                  </TableRow>
+                ))}
+                {lista.length === 0 && <TableRow><TableCell colSpan={tabela.getVisibleLeafColumns().length} className="h-24 text-center text-muted-foreground">Brak aut dla tych filtrów.</TableCell></TableRow>}
+              </TableBody>
+            </Table>
+          </Sortowanie.Provider>
         </div>
       )}
-      {lista.length === 0 && <p className="text-muted-foreground">Brak aut dla tych filtrów.</p>}
+      {wTelefonie && lista.length === 0 && <p className="text-muted-foreground">Brak aut dla tych filtrów.</p>}
 
       <div className="flex flex-wrap items-center justify-end gap-2 text-sm">
         <span className="text-muted-foreground">Na stronie</span>
-        <Wybor className="h-8 w-20" value={strona.pageSize === 50 ? "" : String(strona.pageSize)} opcje={ROZMIARY} puste="50" onChange={(v) => { tabela.setPageSize(Number(v || 50)); pierwsza() }} />
+        <Wybor size="sm" className="w-20" value={strona.pageSize === 50 ? "" : String(strona.pageSize)} opcje={ROZMIARY} puste="50" onChange={(v) => { tabela.setPageSize(Number(v || 50)); pierwsza() }} />
         <span className="text-muted-foreground">Strona {strona.pageIndex + 1} z {tabela.getPageCount() || 1}</span>
-        <Button variant="outline" size="icon-sm" aria-label="Poprzednia strona" disabled={!tabela.getCanPreviousPage()} onClick={() => tabela.previousPage()}><ChevronLeftIcon /></Button>
-        <Button variant="outline" size="icon-sm" aria-label="Następna strona" disabled={!tabela.getCanNextPage()} onClick={() => tabela.nextPage()}><ChevronRightIcon /></Button>
+        <Button variant="outline" size="icon-sm" aria-label="Poprzednia strona" disabled={!tabela.getCanPreviousPage()} onClick={() => zmienStrone(-1)}><ChevronLeftIcon /></Button>
+        <Button variant="outline" size="icon-sm" aria-label="Następna strona" disabled={!tabela.getCanNextPage()} onClick={() => zmienStrone(1)}><ChevronRightIcon /></Button>
       </div>
 
-      {wybrane.length > 0 && (
-        <Card className="sticky bottom-4 z-20 py-2 shadow-lg">
-          <CardContent className="flex flex-wrap items-center gap-2 text-sm">
-            Zaznaczone: {wybrane.length}
-            <span className="ml-auto flex gap-2">
-              <Button size="sm" disabled={postep !== null} onClick={pobierz}><DownloadIcon />{postep ?? "Pobierz paczkę"}</Button>
-              <Button size="sm" variant="outline" onClick={() => zmienZaznaczenie({})}>Wyczyść</Button>
-            </span>
-          </CardContent>
-        </Card>
-      )}
-      <OknoAuta auto={otwarte} waluta={waluta} zamknij={() => ustawOtwarte(null)} />
+      {wybrane.length > 0 && <PasekPaczki wybrane={wybrane} wyczysc={() => zmienZaznaczenie({})} />}
+      <OknoAuta auto={otwarte} waluta={waluta} zamknij={() => ustawOtwarte(null)} widziany={widziany} />
     </>
   )
 }

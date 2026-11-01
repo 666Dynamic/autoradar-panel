@@ -1,3 +1,6 @@
+import * as React from "react"
+
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -9,7 +12,7 @@ const STALE_HOURS = 26
 const STATUS: Record<string, string> = { done: "udany", blocked_no_publish: "zablokowany", failed_no_publish: "błąd" }
 
 const dzien = (d: string) => d.split("-").reverse().join(".")
-const czas = (iso: string | null) => (iso ? new Date(iso).toLocaleString("pl-PL", { dateStyle: "short", timeStyle: "short" }) : "—")
+const czas = (iso: string | null) => (iso ? new Date(iso).toLocaleString("pl-PL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—")
 
 function dlugosc(start: string | null, koniec: string | null) {
   if (!start || !koniec) return "—"
@@ -25,13 +28,13 @@ function Status({ noc }: { noc: Noc }) {
 export function Home({ dane }: { dane: Dane }) {
   const { scan, meta, nights, rows } = dane
   const zBledem = rows.filter((r) => r.note?.startsWith("error:"))
-  const wiek = (Date.now() - Date.parse(meta.stamp_iso)) / 3600000
+  const [wiek] = React.useState(() => (Date.now() - Date.parse(meta.stamp_iso)) / 3600000)
   const kafelki: [string, string][] = [
     ["Ostatni skan", czas(meta.stamp_iso)],
     ["Czas skanu", dlugosc(scan.started, scan.finished)],
     ["Aut z Auto1", fmt(scan.cars)],
     ["Z porównaniem Otomoto", fmt(scan.compared)],
-    ["Spełnia próg", fmt(scan.qualified)],
+    ["Kwalifikujące się", fmt(scan.qualified)],
     ["Błędy", fmt(scan.errors)],
     ["Bez modelu w Otomoto", fmt(scan.unmapped)],
     ["Kurs NBP EUR", `${meta.rate} PLN`],
@@ -39,9 +42,10 @@ export function Home({ dane }: { dane: Dane }) {
   return (
     <>
       {wiek > STALE_HOURS && (
-        <p className="rounded-md border border-destructive p-3 text-destructive">
-          Dane nieaktualne (sprzed {Math.floor(wiek)} h). Ostatni nocny skan się nie udał albo został zablokowany.
-        </p>
+        <Alert variant="destructive">
+          <AlertTitle>Dane nieaktualne (sprzed {Math.floor(wiek)} h)</AlertTitle>
+          <AlertDescription>Ostatni nocny skan się nie udał albo został zablokowany.</AlertDescription>
+        </Alert>
       )}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {kafelki.map(([opis, wartosc]) => (

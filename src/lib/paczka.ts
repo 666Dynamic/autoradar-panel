@@ -1,6 +1,6 @@
 import type JSZip from "jszip"
 
-import { dodatki, fmt, FUEL, GEAR, hpLabel, kmLabel, litersLabel, offersLabel, regLabel, specyfikacjaAuta, tekstFacebook, tekstWhatsApp, wyposazenie, type Wiersz } from "@/lib/auta"
+import { dodatki, hpLabel, kmLabel, litersLabel, offersLabel, regLabel, specyfikacjaAuta, tekstFacebook, tekstWhatsApp, wyposazenie, type Wiersz } from "@/lib/auta"
 import { wczytajSzczegoly, type Szczegoly } from "@/lib/dane"
 import { odczytajOferty } from "@/lib/pamiec"
 
@@ -21,11 +21,11 @@ function trescOferty(r: Wiersz, s?: Szczegoly) {
 async function lista(auta: Wiersz[], szczegoly: Record<string, Szczegoly>) {
   const { default: zapisz } = await import("write-excel-file/browser")
   const naglowki = ["Numer", "Auto", "Rocznik", "Pojemność", "Przebieg", "Moc", "Paliwo", "Skrzynia", "Auto1 (EUR)", "Otomoto (EUR)", "Różnica (EUR)", "Ofert", "Typ aukcji", "Link Otomoto", "Link Auto1", "Raport Auto1"]
-  const komorka = (value: string | null | undefined) => ({ value: value ?? "" })
+  const komorka = (value: string | number | null | undefined) => (typeof value === "number" ? { value: Math.round(value), type: Number } : { value: value ?? "" })
   const wiersze = [
     naglowki.map((value) => ({ value, fontWeight: "bold" as const })),
-    ...auta.map((r) => [r.id, r.title, regLabel(r), litersLabel(r), kmLabel(r), hpLabel(r), (r.fuel && FUEL[r.fuel]) || r.fuel, (r.gear && GEAR[r.gear]) || r.gear,
-      fmt(r.a_eur), fmt(r.o_eur), fmt(r.d_eur), offersLabel(r), r._label, r.search_url, r.auto1_url, szczegoly[r.id]?.report].map(komorka)),
+    ...auta.map((r) => [r.id, r.title, regLabel(r), litersLabel(r), kmLabel(r), hpLabel(r), r._fuel, r._gear,
+      r.a_eur, r.o_eur, r.d_eur, offersLabel(r), r._label, r.search_url, r.auto1_url, szczegoly[r.id]?.report].map(komorka)),
   ]
   return zapisz(wiersze as never).toBlob()
 }
@@ -76,6 +76,6 @@ export async function pobierzPaczke(auta: Wiersz[], postep: (gotowe: number, raz
   link.href = URL.createObjectURL(plik)
   link.download = auta.length === 1 ? `${nazwa(auta[0].title)}.zip` : "autoradar-oferty.zip"
   link.click()
-  URL.revokeObjectURL(link.href)
+  setTimeout(() => URL.revokeObjectURL(link.href), 60000)
   return { zdjecia: zadania.length, bledy }
 }

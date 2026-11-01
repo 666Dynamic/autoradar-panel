@@ -36,9 +36,14 @@ function Zdjecia({ auto, zdjecia }: { auto: Wiersz; zdjecia: string[] }) {
   const zmien = (lista: string[]) => { ustawWybrane(lista); zapiszOferte(auto.id, { zdjecia: lista }) }
   const pobierz = async () => {
     ustawPostep("Pakuję…")
-    const { zdjecia: razem, bledy } = await pobierzPaczke([auto], (g, r) => ustawPostep(`Pobieram ${g}/${r}`))
-    ustawPostep(null)
-    if (bledy) toast.error(`Nie udało się pobrać ${bledy} z ${razem} zdjęć.`)
+    try {
+      const { zdjecia: razem, bledy } = await pobierzPaczke([auto], (g, r) => ustawPostep(`Pobieram zdjęcia ${g}/${r}`))
+      if (bledy) toast.error(`Nie udało się pobrać ${bledy} z ${razem} zdjęć.`)
+    } catch {
+      toast.error("Nie udało się przygotować paczki.")
+    } finally {
+      ustawPostep(null)
+    }
   }
   if (!zdjecia.length) return <p className="text-sm text-muted-foreground">Brak zdjęć.</p>
   return (
@@ -48,7 +53,7 @@ function Zdjecia({ auto, zdjecia }: { auto: Wiersz; zdjecia: string[] }) {
           {zdjecia.map((url, i) => (
             <CarouselItem key={url} className="relative">
               <img src={url} alt={`${auto.title}, zdjęcie ${i + 1}`} loading="lazy" className="mx-auto max-h-[45svh] rounded-lg object-contain" />
-              <Checkbox className="absolute top-2 left-6 size-5 bg-background" aria-label={`Wybierz zdjęcie ${i + 1}`} checked={wybrane.includes(url)} onCheckedChange={(v) => zmien(v === true ? [...wybrane, url] : wybrane.filter((x) => x !== url))} />
+              <Checkbox className="absolute top-2 left-6 size-5 bg-background" aria-label={`Wybierz zdjęcie ${i + 1}`} checked={wybrane.includes(url)} onCheckedChange={(v) => zmien(zdjecia.filter((x) => (x === url ? v === true : wybrane.includes(x))))} />
             </CarouselItem>
           ))}
         </CarouselContent>
@@ -65,7 +70,7 @@ function Zdjecia({ auto, zdjecia }: { auto: Wiersz; zdjecia: string[] }) {
   )
 }
 
-export function OknoAuta({ auto, waluta, zamknij }: { auto: Wiersz | null; waluta: Waluta; zamknij: () => void }) {
+export function OknoAuta({ auto, waluta, zamknij, widziany }: { auto: Wiersz | null; waluta: Waluta; zamknij: () => void; widziany: (id: string) => void }) {
   const [szczegoly, ustaw] = React.useState<Record<string, Szczegoly> | null>(null)
   React.useEffect(() => {
     if (auto) wczytajSzczegoly().then(ustaw)
@@ -81,7 +86,7 @@ export function OknoAuta({ auto, waluta, zamknij }: { auto: Wiersz | null; walut
               <DialogTitle className="pr-6">{auto.title || auto.id}</DialogTitle>
               <DialogDescription>{auto.id} · {auto._label}{auto.unroadworthy ? " · niezdatne do jazdy" : ""}</DialogDescription>
             </DialogHeader>
-            {szczegoly && <Zdjecia key={auto.id} auto={auto} zdjecia={zdjeciaAuta(auto, s)} />}
+            {szczegoly ? <Zdjecia key={auto.id} auto={auto} zdjecia={zdjeciaAuta(auto, s)} /> : <p className="text-sm text-muted-foreground">Wczytuję zdjęcia…</p>}
             <dl className="grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
               {[...specyfikacjaAuta(auto),
                 ["Auto1", pieniadze(kwota(auto, "a", waluta), waluta)], ["Otomoto", pieniadze(kwota(auto, "o", waluta), waluta)],
@@ -95,7 +100,7 @@ export function OknoAuta({ auto, waluta, zamknij }: { auto: Wiersz | null; walut
             {sprzet.length > 0 && <p className="text-sm text-muted-foreground">{sprzet.join(" · ")}</p>}
             <div className="flex flex-wrap gap-2">
               {auto.auto1_url && <Button asChild variant="outline" className="flex-1"><a href={auto.auto1_url} target="_blank" rel="noopener">Auto1</a></Button>}
-              {auto.search_url && <Button asChild variant="outline" className="flex-1"><a href={auto.search_url} target="_blank" rel="noopener">Otomoto</a></Button>}
+              {auto.search_url && <Button asChild variant="outline" className="flex-1"><a href={auto.search_url} target="_blank" rel="noopener" onClick={() => widziany(auto.id)}>Otomoto</a></Button>}
               {s?.report && <Button asChild variant="outline" className="flex-1"><a href={s.report} target="_blank" rel="noopener">Raport</a></Button>}
             </div>
             {szczegoly && (

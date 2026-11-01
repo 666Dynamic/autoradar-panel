@@ -18,7 +18,7 @@ const squeeze = (s: string) => s.replace(/[^a-z0-9]/g, "")
 export function przygotuj(rows: Auto[]): Wiersz[] {
   return rows.map((r) => {
     const key = r.auction ?? ""
-    const hay = fold([r.id, r.make, r.model, r.title].filter(Boolean).join(" "))
+    const hay = fold([r.make, r.model, r.title].filter(Boolean).join(" "))
     // Sąsiednie słowa razem: „e220” znajdzie „E 220 d”, ale nie „GLE 220”.
     const w = hay.split(/[^a-z0-9]+/).filter(Boolean)
     return {
@@ -45,7 +45,7 @@ export function szukane(tekst: string): Szukane {
 export function pasuje(r: Wiersz, s: Szukane) {
   if (!s.words.length) return true
   // Dwa znaki to model („a4”), nie numer auta.
-  return (s.id.length >= 3 && r._id.includes(s.id)) || s.words.every(({ raw, bare }) => r._hay.includes(raw) || (bare && r._joined.includes(" " + bare)))
+  return (s.id.length >= 3 && r._id.includes(s.id)) || s.words.every(({ raw, bare }) => r._hay.includes(raw) || (bare && r._joined.includes(" " + bare)) || (bare.length >= 3 && r._id.includes(bare)))
 }
 
 export const fmt = (n: number | null | undefined) => (n === null || n === undefined ? "—" : Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, "."))
@@ -87,8 +87,8 @@ function wartosc(r: Wiersz, key: string, w: Waluta): string | number | null | un
     case "liters": return r.liters
     case "km": return r.km
     case "hp": return r.hp
-    case "fuel": return r.fuel
-    case "gear": return r.gear
+    case "fuel": return r._fuel
+    case "gear": return r._gear
     case "rank": return r.ok ? 2 : r.d_eur === null ? 0 : 1
   }
 }

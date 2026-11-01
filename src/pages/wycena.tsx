@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Wybor } from "@/components/wybor"
+import { pieniadze } from "@/lib/auta"
 
 // Skrypty strony wyceny, bez zmian: public/wycena/catalog.js i filtry.js.
 declare const KATALOG: { makes: [string, string][]; models: Record<string, [string, string][]> }
@@ -19,7 +20,7 @@ declare const FILTRY: {
 
 // Adres pośrednika worker.mjs z projektu wycena-aut.
 const SZUKAJ_URL = "https://wycena-aut.hfnvflmwxetmfpc.workers.dev/"
-const zl = (kwota: number) => Math.round(kwota).toLocaleString("pl-PL") + " zł"
+const zl = (kwota: number) => pieniadze(kwota, "pln")
 const PALIWA: [string, string][] = [["petrol", "Benzyna"], ["diesel", "Diesel"], ["hybrid", "Hybryda"], ["plugin-hybrid", "Hybryda Plug-in"], ["petrol-lpg", "Benzyna+LPG"], ["petrol-cng", "Benzyna+CNG"], ["electric", "Elektryczny"], ["etanol", "Etanol"], ["hidrogen", "Wodór"]]
 const SKRZYNIE: [string, string][] = [["manual", "Manualna"], ["automatic", "Automatyczna"]]
 const PUSTE = { marka: "", model: "", paliwo: "", skrzynia: "", rok: "", moc: "", przebieg: "", rokOd: "", rokDo: "", mocOd: "", mocDo: "", przebiegDo: "" }
@@ -72,7 +73,10 @@ export function Wycena() {
   const [p, ustawP] = React.useState(PUSTE)
   const [wynik, ustawWynik] = React.useState("")
 
-  const zmien = (zmiany: Partial<Pola>) => { ustawP((x) => ({ ...x, ...zmiany })); ustawWynik("") }
+  // Odpowiedź na stare zapytanie nie może nadpisać nowych pól.
+  const zapytanie = React.useRef(0)
+
+  const zmien = (zmiany: Partial<Pola>) => { zapytanie.current++; ustawP((x) => ({ ...x, ...zmiany })); ustawWynik("") }
   const zmienAuto = (pole: "rok" | "moc" | "przebieg", wartosc: string) => zmien({ [pole]: wartosc, ...okno(pole, wartosc) })
   const wczytaj = (nowy: string) => {
     ustawTekst(nowy)
@@ -86,12 +90,15 @@ export function Wycena() {
   const wyszukaj = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!filtry) { ustawWynik("Wybierz markę."); return }
+    const numer = ++zapytanie.current
     ustawWynik("Szukam…")
+    let tresc: string
     try {
-      ustawWynik(await szukaj(filtry))
+      tresc = await szukaj(filtry)
     } catch (blad) {
-      ustawWynik((blad instanceof TypeError ? "Brak połączenia." : (blad as Error).message) + " Użyj Otwórz Otomoto.")
+      tresc = (blad instanceof TypeError ? "Brak połączenia." : (blad as Error).message) + " Użyj Otwórz Otomoto."
     }
+    if (numer === zapytanie.current) ustawWynik(tresc)
   }
 
   return (

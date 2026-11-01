@@ -9,11 +9,11 @@ const POSREDNIK = "https://wycena-aut.hfnvflmwxetmfpc.workers.dev/?zdjecie="
 const NARAZ = 4
 
 export const zdjeciaAuta = (r: Wiersz, s?: Szczegoly) => (s?.images.length ? s.images : r.image ? [r.image] : [])
-const nazwa = (tekst: string) => tekst.replace(/[^\p{L}\p{N} .-]/gu, "").trim().slice(0, 60) || "auto"
+const nazwa = (tekst: string) => tekst.normalize("NFD").replace(/ł/g, "l").replace(/Ł/g, "L").replace(/[^A-Za-z0-9 .-]/g, "").trim().slice(0, 60) || "auto"
 
 function trescOferty(r: Wiersz, s?: Szczegoly) {
   const sprzet = wyposazenie(s)
-  return [r.title, r.id, "", ...specyfikacjaAuta(r).map(([k, v]) => `${k}: ${v}`),
+  return [r.title, r.id, "", ...specyfikacjaAuta(r).filter(([, v]) => v !== "—").map(([k, v]) => `${k}: ${v}`),
     ...dodatki(s).map(([k, v]) => `${k}: ${v}`),
     ...(sprzet.length ? ["", "Wyposażenie:", ...sprzet.map((x) => `- ${x}`)] : [])].join("\n")
 }

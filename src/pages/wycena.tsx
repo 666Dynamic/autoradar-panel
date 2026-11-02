@@ -104,6 +104,7 @@ export function Wycena() {
   return (
     <form className="grid items-start gap-4 lg:grid-cols-2" onSubmit={wyszukaj}>
       <Card>
+        <CardHeader><CardTitle>Auto</CardTitle></CardHeader>
         <CardContent className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
             <Label htmlFor="tekst">Wklej albo wpisz auto</Label>

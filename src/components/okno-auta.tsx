@@ -25,7 +25,7 @@ function Tekst({ id, rodzaj, domyslny }: { id: string; rodzaj: "whatsapp" | "fac
   const kopiuj = () => navigator.clipboard.writeText(tresc).then(() => {
     ustawSkopiowano(true)
     setTimeout(() => ustawSkopiowano(false), 1500)
-  })
+  }, () => toast.error("Nie udało się skopiować."))
   return (
     <div className="relative">
       <Textarea className="max-h-40 pr-10" value={tresc} onChange={(e) => { ustaw(e.target.value); zapiszOferte(id, { [rodzaj]: e.target.value }) }} />

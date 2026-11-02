@@ -91,9 +91,9 @@ export async function wczytajDane(): Promise<Dane> {
 const ADRES_SZCZEGOLOW = ADRES.replace("data.json", "szczegoly.json")
 let szczegoly: Promise<Record<string, Szczegoly>> | null = null
 
-// Bez pliku (noc sprzed zmiany, błąd sieci) auto ma tylko pierwsze zdjęcie z głównych danych.
+// Bez pliku (noc sprzed zmiany, błąd sieci) auto ma tylko pierwsze zdjęcie z głównych danych; następne otwarcie próbuje znowu.
 export function wczytajSzczegoly() {
-  szczegoly ??= fetch(ADRES_SZCZEGOLOW, { cache: "no-cache" }).then((o) => (o.ok ? o.json() : {})).catch(() => {
+  szczegoly ??= fetch(ADRES_SZCZEGOLOW, { cache: "no-cache" }).then((o) => (o.ok ? o.json() : Promise.reject(o.status))).catch(() => {
     szczegoly = null
     return {}
   })

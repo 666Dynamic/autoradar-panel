@@ -74,7 +74,7 @@ export function Home({ dane }: { dane: Dane }) {
     ["Kwalifikujące się", fmt(scan.qualified)],
     ["Błędy", fmt(scan.errors)],
     ["Bez modelu w Otomoto", fmt(scan.unmapped)],
-    [`Kurs NBP EUR z ${dzien(meta.rate_date)}`, `${meta.rate} PLN`],
+    [`Kurs NBP EUR z ${dzien(meta.rate_date)}`, `${meta.rate.replace(".", ",")} zł`],
   ]
   return (
     <>

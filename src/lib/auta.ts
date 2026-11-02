@@ -165,12 +165,16 @@ const KRAJE: Record<string, string> = { DE: "Niemcy", NL: "Holandia", BE: "Belgi
 
 export const lokalizacja = (s?: Szczegoly) => [s?.city, s?.country && (KRAJE[s.country] ?? s.country)].filter(Boolean).join(", ") || "—"
 
-// Stawka akcyzy w procentach: do 2,0 l 3,1%, powyżej 18,6%, hybryda połowa, elektryk 0. Bez pojemności decyduje wybór w oknie.
+// Stawka akcyzy w procentach (2026): do 2,0 l 3,1%, powyżej 18,6%. Hybryda do 3,5 l połowa, hybryda plug-in do 2,0 l
+// zwolniona do końca 2029, elektryk 0. Plug-in rozpoznawany po tytule. Bez pojemności decyduje wybór w oknie.
+// Sprawdzone na 125 hybrydach z 02.11: reszta to zwykłe hybrydy (Toyota, Kia Niro, E-Tech, C 300 Hybrid).
+const PLUG_IN = /plug-in|phev|\bgte\b|\biv\b|\d{2,3}\s?x?e\b|tfsi ?e\b|e-tron|\bde\b|recharge|4xe|e-?hybrid|\bt8\b|twin engine|cooper s e\b|hybrid ?4\b|^(peugeot|citro.n|ds|opel) .*1\.6 hybrid/i
 export function stawkaAkcyzy(r: Auto, ponad2l: boolean | null): number | null {
   if (r.fuel === "electro") return 0
   const duzy = r.liters != null ? r.liters > 2 : ponad2l
   if (duzy === null) return null
-  return (duzy ? 18.6 : 3.1) / (r.fuel === "hybrid" ? 2 : 1)
+  if (r.fuel === "hybrid" && (r.liters == null || r.liters <= 3.5)) return !duzy && PLUG_IN.test(r.title) ? 0 : duzy ? 9.3 : 1.55
+  return duzy ? 18.6 : 3.1
 }
 
 // Teksty bez ceny zakupu i bez linku do Auto1. Krótkie: dane w jednej linii, dodatki w drugiej.

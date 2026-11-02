@@ -24,7 +24,16 @@ export function App() {
     return () => window.removeEventListener("hashchange", zmien)
   }, [])
   React.useEffect(() => {
+    let wczytane = Date.now()
     wczytajDane().then(ustawDane).catch(() => ustawBlad(true))
+    // Karta otwarta przez noc: po powrocie do niej strona bierze dane z nowego skanu.
+    const odswiez = () => {
+      if (document.visibilityState !== "visible" || Date.now() - wczytane < 3600000) return
+      wczytane = Date.now()
+      wczytajDane().then(ustawDane).catch(() => {})
+    }
+    document.addEventListener("visibilitychange", odswiez)
+    return () => document.removeEventListener("visibilitychange", odswiez)
   }, [])
 
   const [odwiedzone, ustawOdwiedzone] = React.useState(() => new Set([strona]))
@@ -38,7 +47,7 @@ export function App() {
         <main className="flex min-w-0 flex-1 flex-col gap-4 p-4 lg:p-6">
           {wymagaDanych && blad && <p className="text-destructive">Nie udało się wczytać danych. Odśwież stronę.</p>}
           {wymagaDanych && !blad && !dane && <p className="text-muted-foreground">Wczytuję dane…</p>}
-          {strona === "home" && dane && <Home dane={dane} />}
+          {strona === "home" && dane && <Home key={dane.meta.stamp_iso} dane={dane} />}
           {/* Auto1 i Wycena zostają w pamięci, żeby filtry i wpisane dane przetrwały przejście między stronami. */}
           {dane && odwiedzone.has("auto1") && <div className={strona === "auto1" ? "flex min-w-0 flex-1 flex-col gap-4" : "hidden"}><Auto1 dane={dane} /></div>}
           {odwiedzone.has("wycena") && <div className={strona === "wycena" ? "contents" : "hidden"}><Wycena /></div>}

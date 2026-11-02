@@ -160,11 +160,11 @@ export function Auto1({ dane }: { dane: Dane }) {
   const wWidoku = React.useCallback((r: Wiersz) => widok === "all" || dealerski === r._dealer, [widok, dealerski])
   // Nowe: pierwszy raz w ostatniej nocy. Pierwsza noc historii nie ma z czym porównać, więc tam nic nie jest nowe.
   const nowe = React.useMemo(() => {
-    const noce = auta.map((r) => r.since).filter((x): x is string => !!x).sort()
-    const ostatnia = noce.at(-1)
-    return (r: Wiersz) => !!ostatnia && ostatnia !== noce[0] && r.since === ostatnia
-  }, [auta])
-  const zHistoria = auta.some((r) => r.a_prev_eur != null)
+    const pierwsza = auta.reduce<string | undefined>((m, r) => (r.since && (!m || r.since < m) ? r.since : m), undefined)
+    const ostatnia = dane.nights.find((n) => n.status === "done")?.day // noc bez nowych aut nie zostawia znaczka na wczorajszych
+    return (r: Wiersz) => !!ostatnia && ostatnia !== pierwsza && r.since === ostatnia
+  }, [auta, dane])
+  const zHistoria = React.useMemo(() => auta.some((r) => r.a_prev_eur != null), [auta])
   const odroczonyTekst = React.useDeferredValue(tekst) // przy 300 wierszach pisanie nie czeka na tabelę
   const s = React.useMemo(() => szukane(odroczonyTekst), [odroczonyTekst])
 
@@ -216,7 +216,7 @@ export function Auto1({ dane }: { dane: Dane }) {
     zapisz("ar_seen", [...n])
     return n
   })
-  const wybrane = auta.filter((r) => zaznaczone[r.id])
+  const wybrane = React.useMemo(() => auta.filter((r) => zaznaczone[r.id]), [auta, zaznaczone])
   const aktywneFiltry = JSON.stringify(f) !== JSON.stringify(POCZATEK) || tekst !== ""
   const zmienStrone = (krok: number) => {
     tabela.setPageIndex((i) => i + krok)
@@ -314,7 +314,7 @@ export function Auto1({ dane }: { dane: Dane }) {
                   <Checkbox className="mt-1" aria-label={`Zaznacz ${r.id}`} checked={!!zaznaczone[r.id]} onCheckedChange={(v) => tabela.getRow(r.id).toggleSelected(v === true)} />
                   <div><button className="text-left font-medium" onClick={() => ustawOtwarte(r)}>{r.title || r.id}</button>{r.unroadworthy && <Niezdatne />}{nowe(r) && <Badge variant="secondary" className="ml-1.5">nowe</Badge>}</div>
                 </div>
-                <p className="text-xs text-muted-foreground">{[regLabel(r), kmLabel(r), litersLabel(r), hpLabel(r), r._fuel, r._gear].join(" · ")}</p>
+                <p className="text-xs text-muted-foreground">{r.id} · {r._label}<br />{[regLabel(r), kmLabel(r), litersLabel(r), hpLabel(r), r._fuel, r._gear].filter((x) => x !== "—").join(" · ")}</p>
                 <div className="grid grid-cols-3 gap-y-2 text-sm">
                   <span><span className="block text-xs text-muted-foreground">Auto1</span><CenaAuto1 r={r} waluta={waluta} kurs={dane.meta.rate_value} /></span>
                   <span><span className="block text-xs text-muted-foreground">Otomoto</span>{pieniadze(kwota(r, "o", waluta), waluta)}</span>
@@ -323,7 +323,10 @@ export function Auto1({ dane }: { dane: Dane }) {
                   {dealerski && <span className="col-span-2"><span className="block text-xs text-muted-foreground">Koniec</span>{endLabel(r)}</span>}
                 </div>
                 <div className="flex items-center justify-between gap-2">
-                  <Roznica r={r} waluta={waluta} kurs={dane.meta.rate_value} />
+                  <span className="flex items-center gap-2">
+                    <Roznica r={r} waluta={waluta} kurs={dane.meta.rate_value} />
+                    {r.d_eur !== null && r.t !== null && <span className="text-xs text-muted-foreground">próg {pieniadze(waluta === "pln" ? r.t * dane.meta.rate_value : r.t, waluta)}</span>}
+                  </span>
                   {r.search_url && <a className="text-sm underline" href={r.search_url} target="_blank" rel="noopener" onClick={() => widziany(r.id)}>Otomoto</a>}
                 </div>
               </CardContent>

@@ -10,7 +10,8 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, Di
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
-import { kwota, offersLabel, pieniadze, specyfikacjaAuta, tekstFacebook, tekstWhatsApp, wyposazenieOkna, type Waluta, type Wiersz } from "@/lib/auta"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { dodatki, endLabel, kwota, lokalizacja, offersLabel, pieniadze, specyfikacjaAuta, stawkaAkcyzy, tekstFacebook, tekstWhatsApp, wyposazenieOkna, type Waluta, type Wiersz } from "@/lib/auta"
 import { wczytajSzczegoly, type Szczegoly } from "@/lib/dane"
 import { pobierzPaczke, zdjeciaAuta } from "@/lib/paczka"
 import { odczytajOferty, zapiszOferte } from "@/lib/pamiec"
@@ -129,6 +130,48 @@ function HistoriaCeny({ ceny, waluta, kurs }: { ceny: [string, number | null, nu
   )
 }
 
+function Lista({ tytul, wiersze }: { tytul: string; wiersze: [string, React.ReactNode][] }) {
+  return (
+    <div className="flex flex-col gap-1 text-sm">
+      <h3 className="font-medium">{tytul}</h3>
+      <dl className="flex flex-col gap-1">
+        {wiersze.map(([k, v]) => (
+          <div key={k} className="flex justify-between gap-3">
+            <dt className="shrink-0 text-muted-foreground">{k}</dt>
+            <dd className="text-right tabular-nums">{v}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  )
+}
+
+// Kwota w wybranej walucie, obok w drugiej.
+function Obie({ auto, pole, waluta }: { auto: Wiersz; pole: "a" | "o" | "d" | "bid"; waluta: Waluta }) {
+  const druga: Waluta = waluta === "eur" ? "pln" : "eur"
+  if (kwota(auto, pole, waluta) == null) return "—"
+  return <>{pieniadze(kwota(auto, pole, waluta), waluta)} <span className="text-muted-foreground">· {pieniadze(kwota(auto, pole, druga), druga)}</span></>
+}
+
+// Akcyza od ceny Auto1 w złotych, tylko informacyjnie. Gdy tytuł nie podaje pojemności, stawkę wybiera się tutaj.
+function Akcyza({ auto }: { auto: Wiersz }) {
+  const [ponad2l, ustaw] = React.useState<boolean | null>(null)
+  const stawka = stawkaAkcyzy(auto, ponad2l)
+  const wybor = auto.liters == null && auto.fuel !== "electro" && (
+    <ToggleGroup type="single" variant="outline" size="sm" className="ml-auto" value={ponad2l === null ? "" : ponad2l ? "duzy" : "maly"} onValueChange={(v) => v && ustaw(v === "duzy")}>
+      <ToggleGroupItem value="maly">do 2,0 l</ToggleGroupItem>
+      <ToggleGroupItem value="duzy">ponad 2,0 l</ToggleGroupItem>
+    </ToggleGroup>
+  )
+  if (stawka === null || auto.a_pln === null) return wybor || "—"
+  return (
+    <span className="flex flex-col items-end gap-1">
+      <span>{pieniadze(auto.a_pln * stawka / 100, "pln")} <span className="text-muted-foreground">· {String(stawka).replace(".", ",")}%</span></span>
+      {wybor}
+    </span>
+  )
+}
+
 export function OknoAuta({ auto, waluta, kurs, zamknij, widziany }: { auto: Wiersz | null; waluta: Waluta; kurs: number; zamknij: () => void; widziany: (id: string) => void }) {
   const [szczegoly, ustaw] = React.useState<Record<string, Szczegoly> | null>(null)
   React.useEffect(() => {
@@ -143,19 +186,18 @@ export function OknoAuta({ auto, waluta, kurs, zamknij, widziany }: { auto: Wier
           <>
             <DialogHeader>
               <DialogTitle className="pr-6">{auto.title || auto.id}</DialogTitle>
-              <DialogDescription>{auto.id} · {auto._label}{auto.unroadworthy ? " · niezdatne do jazdy" : ""}</DialogDescription>
+              <DialogDescription>{auto.id}{auto.unroadworthy ? " · niezdatne do jazdy" : ""}</DialogDescription>
             </DialogHeader>
             {szczegoly ? <Zdjecia key={auto.id} auto={auto} zdjecia={zdjeciaAuta(auto, s)} /> : <p className="text-sm text-muted-foreground">Wczytuję zdjęcia…</p>}
-            <dl className="grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
-              {[...specyfikacjaAuta(auto),
-                ["Auto1", pieniadze(kwota(auto, "a", waluta), waluta)], ["Otomoto", pieniadze(kwota(auto, "o", waluta), waluta)],
-                ["Różnica", pieniadze(kwota(auto, "d", waluta), waluta)], ["Ofert", offersLabel(auto)]].map(([k, v]) => (
-                <div key={k} className="flex justify-between gap-2">
-                  <dt className="text-muted-foreground">{k}</dt>
-                  <dd className="tabular-nums">{v}</dd>
-                </div>
-              ))}
-            </dl>
+            <div className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
+              <Lista tytul="Auto" wiersze={[...specyfikacjaAuta(auto), ...dodatki(s), ["Lokalizacja", lokalizacja(s)], ["Typ aukcji", auto._label],
+                ...(auto.end_ms != null ? [["Koniec aukcji", endLabel(auto)] as [string, string]] : [])]} />
+              <Lista tytul="Ceny i koszty" wiersze={[
+                ["Auto1", <Obie key="a" auto={auto} pole="a" waluta={waluta} />], ["Otomoto (średnia)", <Obie key="o" auto={auto} pole="o" waluta={waluta} />],
+                ["Różnica", <Obie key="d" auto={auto} pole="d" waluta={waluta} />], ["Próg", pieniadze(auto.t === null ? null : waluta === "eur" ? auto.t : auto.t * kurs, waluta)],
+                ["Ofert", offersLabel(auto)], ...(auto._dealer ? [["Licytuj do", <Obie key="bid" auto={auto} pole="bid" waluta={waluta} />] as [string, React.ReactNode]] : []),
+                ["Akcyza", <Akcyza key={auto.id} auto={auto} />]]} />
+            </div>
             {sprzet.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {sprzet.map(([nazwa, rzadkie]) => <Badge key={nazwa} variant={rzadkie ? "secondary" : "outline"}>{nazwa}</Badge>)}

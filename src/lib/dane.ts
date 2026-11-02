@@ -40,6 +40,8 @@ export type Szczegoly = {
   colour?: string | number
   doors?: string | number
   emissionStandard?: string | number
+  city?: string
+  country?: string
   allWheelDrive?: boolean
   ac?: boolean
   backupCamera?: boolean

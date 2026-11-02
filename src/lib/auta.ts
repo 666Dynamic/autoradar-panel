@@ -130,7 +130,7 @@ export function porownaj(a: Wiersz, b: Wiersz, s: Sort, w: Waluta) {
   return s.dir * ((x as number) - (y as number))
 }
 
-const specyfikacja = (r: Auto) => [
+const specyfikacja = (r: Auto): [string, string][] => [
   ["Rocznik", regLabel(r)], ["Przebieg", kmLabel(r)], ["Pojemność", litersLabel(r)], ["Moc", hpLabel(r)],
   ["Paliwo", (r.fuel && FUEL[r.fuel]) || r.fuel || "—"], ["Skrzynia", (r.gear && GEAR[r.gear]) || r.gear || "—"],
 ]
@@ -155,11 +155,23 @@ export function wyposazenieOkna(s?: Szczegoly) {
 
 const KOLORY: Record<string, string> = { black: "czarny", gray: "szary", grey: "szary", white: "biały", silver: "srebrny", blue: "niebieski", red: "czerwony", green: "zielony", brown: "brązowy", beige: "beżowy", yellow: "żółty", orange: "pomarańczowy", gold: "złoty", purple: "fioletowy" }
 
-export const dodatki = (s?: Szczegoly) => [
-  ...(typeof s?.colour === "string" ? [["Kolor", KOLORY[s.colour] ?? s.colour]] : []),
-  ...(s?.doors ? [["Drzwi", String(s.doors)]] : []),
-  ...(typeof s?.emissionStandard === "string" ? [["Norma emisji", s.emissionStandard]] : []),
+export const dodatki = (s?: Szczegoly): [string, string][] => [
+  ...(typeof s?.colour === "string" ? [["Kolor", KOLORY[s.colour] ?? s.colour] as [string, string]] : []),
+  ...(s?.doors ? [["Drzwi", String(s.doors)] as [string, string]] : []),
+  ...(typeof s?.emissionStandard === "string" ? [["Norma emisji", s.emissionStandard] as [string, string]] : []),
 ]
+
+const KRAJE: Record<string, string> = { DE: "Niemcy", NL: "Holandia", BE: "Belgia", FR: "Francja", IT: "Włochy", ES: "Hiszpania", AT: "Austria", PL: "Polska", SE: "Szwecja", DK: "Dania", CZ: "Czechy", PT: "Portugalia", LU: "Luksemburg", CH: "Szwajcaria" }
+
+export const lokalizacja = (s?: Szczegoly) => [s?.city, s?.country && (KRAJE[s.country] ?? s.country)].filter(Boolean).join(", ") || "—"
+
+// Stawka akcyzy w procentach: do 2,0 l 3,1%, powyżej 18,6%, hybryda połowa, elektryk 0. Bez pojemności decyduje wybór w oknie.
+export function stawkaAkcyzy(r: Auto, ponad2l: boolean | null): number | null {
+  if (r.fuel === "electro") return 0
+  const duzy = r.liters != null ? r.liters > 2 : ponad2l
+  if (duzy === null) return null
+  return (duzy ? 18.6 : 3.1) / (r.fuel === "hybrid" ? 2 : 1)
+}
 
 // Teksty bez ceny zakupu i bez linku do Auto1. Krótkie: dane w jednej linii, dodatki w drugiej.
 function linieOferty(r: Auto, s?: Szczegoly) {

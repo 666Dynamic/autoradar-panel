@@ -71,7 +71,7 @@ function Zdjecia({ auto, zdjecia }: { auto: Wiersz; zdjecia: string[] }) {
           {zdjecia.map((url, i) => (
             <CarouselItem key={url} className="relative">
               <img src={url} alt={`${auto.title}, zdjęcie ${i + 1}`} loading="lazy" className="mx-auto max-h-[38svh] rounded-lg object-contain" />
-              <Checkbox className="absolute top-2 left-6 size-5 bg-background" aria-label={`Wybierz zdjęcie ${i + 1}`} checked={wybrane.includes(url)} onCheckedChange={(v) => zmien(zdjecia.filter((x) => (x === url ? v === true : wybrane.includes(x))))} />
+              <Checkbox className="absolute top-2 left-6 size-5 bg-background max-md:size-6" aria-label={`Wybierz zdjęcie ${i + 1}`} checked={wybrane.includes(url)} onCheckedChange={(v) => zmien(zdjecia.filter((x) => (x === url ? v === true : wybrane.includes(x))))} />
             </CarouselItem>
           ))}
         </CarouselContent>

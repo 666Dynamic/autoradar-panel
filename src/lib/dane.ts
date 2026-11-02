@@ -64,6 +64,19 @@ export type Noc = {
   finished: string | null
 }
 
+// Liczone w nocy z historii ogłoszeń Otomoto (autoradar/market.py); null, dopóki noc go nie wysyła.
+export type Rynek = {
+  since: string
+  nights: number
+  windows: {
+    days: number
+    gone: number
+    counted: number
+    median_days: number | null
+    trend: { from: string; searches: number; change_pct: number | null } | null
+  }[]
+}
+
 export type Dane = {
   meta: { stamp_iso: string; rate: string; rate_value: number; rate_date: string }
   scan: {
@@ -76,6 +89,7 @@ export type Dane = {
     unmapped: number | null
   }
   nights: Noc[]
+  market?: Rynek | null
   rows: Auto[]
 }
 

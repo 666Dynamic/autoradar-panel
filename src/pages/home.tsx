@@ -7,7 +7,7 @@ import { Card, CardAction, CardDescription, CardHeader, CardTitle } from "@/comp
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { fmt, powodBledu } from "@/lib/auta"
-import type { Auto, Dane, Noc } from "@/lib/dane"
+import type { Auto, Dane, Noc, Rynek } from "@/lib/dane"
 
 // Skan publikuje co noc; starsze dane znaczą, że ostatni się nie udał albo został zablokowany.
 const STALE_HOURS = 26
@@ -62,6 +62,40 @@ function Status({ noc }: { noc: Noc }) {
   return <Badge variant={zly ? "destructive" : "outline"}>{(noc.status && STATUS[noc.status]) || noc.status || "—"}</Badge>
 }
 
+const procent = (p: number | null | undefined) => (p == null ? "—" : `${p > 0 ? "+" : ""}${p.toString().replace(".", ",")}%`)
+
+// Ile dni ogłoszenia wiszą do zniknięcia i jak zmienia się średnia Otomoto, w oknie 30 i 90 dni.
+function RynekKafelki({ rynek }: { rynek: Rynek }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-baseline justify-between gap-2">
+        <h2 className="font-semibold">Rynek Otomoto</h2>
+        <span className="text-xs text-muted-foreground">z {rynek.nights} nocy, od {dzien(rynek.since)}</span>
+      </div>
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {rynek.windows.map((w) => (
+          <React.Fragment key={w.days}>
+            <Card>
+              <CardHeader>
+                <CardDescription>Dni do zniknięcia ogłoszenia, {w.days} dni</CardDescription>
+                <CardTitle className="text-xl font-semibold tabular-nums lg:text-2xl">{w.median_days == null ? "—" : fmt(w.median_days)}</CardTitle>
+                <div className="text-xs text-muted-foreground">mediana z {fmt(w.counted)}, zniknęło {fmt(w.gone)}</div>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardDescription>Zmiana średniej Otomoto, {w.days} dni</CardDescription>
+                <CardTitle className="text-xl font-semibold tabular-nums lg:text-2xl">{procent(w.trend?.change_pct)}</CardTitle>
+                <div className="text-xs text-muted-foreground">{w.trend ? `od ${dzien(w.trend.from)}, ${fmt(w.trend.searches)} wyszukiwań` : "za mało nocy"}</div>
+              </CardHeader>
+            </Card>
+          </React.Fragment>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function Home({ dane }: { dane: Dane }) {
   const { scan, meta, nights, rows } = dane
   const zBledem = rows.filter((r) => r.note?.startsWith("error:"))
@@ -95,6 +129,7 @@ export function Home({ dane }: { dane: Dane }) {
           </Card>
         ))}
       </div>
+      {dane.market && <RynekKafelki rynek={dane.market} />}
       <div className="overflow-x-auto rounded-lg border">
         <Table>
           <TableHeader>

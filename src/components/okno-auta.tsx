@@ -235,7 +235,7 @@ export function OknoAuta({ auto, waluta, kurs, zamknij, widziany }: { auto: Wier
               <DialogTitle className="pr-6">{auto.title || auto.id}</DialogTitle>
               <DialogDescription>{auto.id}{auto.unroadworthy ? " · niezdatne do jazdy" : ""}</DialogDescription>
             </DialogHeader>
-            {szczegoly ? <Zdjecia key={auto.id} auto={auto} zdjecia={zdjeciaAuta(auto, s)} /> : <p className="text-sm text-muted-foreground">Wczytuję zdjęcia…</p>}
+            {szczegoly ? <Zdjecia key={`zdjecia-${auto.id}`} auto={auto} zdjecia={zdjeciaAuta(auto, s)} /> : <p className="text-sm text-muted-foreground">Wczytuję zdjęcia…</p>}
             <div className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
               <Lista tytul="Auto" wiersze={[...specyfikacjaAuta(auto), ...dodatki(s), ["Lokalizacja", lokalizacja(s)], ["Typ aukcji", auto._label],
                 ...(auto.end_ms != null ? [["Koniec aukcji", endLabel(auto)] as [string, string]] : [])]} />
@@ -245,7 +245,7 @@ export function OknoAuta({ auto, waluta, kurs, zamknij, widziany }: { auto: Wier
                 ["Ofert", offersLabel(auto)], ...(auto._dealer ? [["Licytuj do", <Obie key="bid" auto={auto} pole="bid" waluta={waluta} />] as [string, React.ReactNode]] : []),
                 ["Akcyza", <Akcyza key={auto.id} auto={auto} ponad2l={ponad2l} ustaw={(v) => ustawWybor({ id: auto.id, ponad2l: v })} />]]} />
             </div>
-            <KosztCalkowity key={auto.id} auto={auto} s={s} waluta={waluta} kurs={kurs} ponad2l={ponad2l} />
+            <KosztCalkowity key={`koszt-${auto.id}`} auto={auto} s={s} waluta={waluta} kurs={kurs} ponad2l={ponad2l} />
             {sprzet.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {sprzet.map(([nazwa, rzadkie]) => <Badge key={nazwa} variant={rzadkie ? "secondary" : "outline"}>{nazwa}</Badge>)}
@@ -258,7 +258,7 @@ export function OknoAuta({ auto, waluta, kurs, zamknij, widziany }: { auto: Wier
               {s?.report && <Button asChild variant="outline" className="flex-1"><a href={s.report} target="_blank" rel="noopener">Raport</a></Button>}
             </div>
             {szczegoly && (
-              <Tabs key={auto.id} defaultValue="whatsapp">
+              <Tabs key={`teksty-${auto.id}`} defaultValue="whatsapp">
                 <TabsList>
                   <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
                   <TabsTrigger value="facebook">Facebook</TabsTrigger>

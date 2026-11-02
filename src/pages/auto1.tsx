@@ -86,11 +86,13 @@ function Roznica({ r, waluta, kurs }: { r: Wiersz; waluta: Waluta; kurs: number 
   )
 }
 
+// Podgląd zamyka się przy kliknięciu: otwarte okno auta zasłania wiersz i podgląd nie dostałby zdarzenia wyjścia myszy.
 function Nazwa({ r, otworz }: { r: Wiersz; otworz: (r: Wiersz) => void }) {
+  const [podglad, ustawPodglad] = React.useState(false)
   return (
-    <HoverCard openDelay={200} closeDelay={0}>
+    <HoverCard open={podglad} onOpenChange={ustawPodglad} openDelay={200} closeDelay={0}>
       <HoverCardTrigger asChild>
-        <button className="inline text-left font-medium hover:underline" onClick={() => otworz(r)}>{r.title || r.id}</button>
+        <button className="inline text-left font-medium hover:underline" onClick={() => { ustawPodglad(false); otworz(r) }}>{r.title || r.id}</button>
       </HoverCardTrigger>
       {r.image && <HoverCardContent side="right" className="w-72 p-1"><img src={r.image} alt={r.title} className="rounded-md" /></HoverCardContent>}
     </HoverCard>

@@ -1,5 +1,5 @@
 import * as React from "react"
-import { CalculatorIcon, CarIcon, HomeIcon, RadarIcon } from "lucide-react"
+import { CalculatorIcon, CarFrontIcon, CarIcon, HomeIcon, RadarIcon } from "lucide-react"
 
 import {
   Sidebar,
@@ -18,6 +18,7 @@ export const STRONY = [
   { id: "home", tytul: "Home", ikona: <HomeIcon /> },
   { id: "auto1", tytul: "Auto1", ikona: <CarIcon /> },
   { id: "wycena", tytul: "Wycena", ikona: <CalculatorIcon /> },
+  { id: "moje-auta", tytul: "Moje auta", ikona: <CarFrontIcon /> },
 ]
 
 export function AppSidebar({ strona, ...props }: { strona: string } & React.ComponentProps<typeof Sidebar>) {

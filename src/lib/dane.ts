@@ -29,6 +29,8 @@ export type Auto = {
   d_pln: number | null
   t: number | null
   ok: boolean
+  since?: string | null // pierwsza noc w historii (90 dni); brak w danych sprzed wydania 10
+  a_prev_eur?: number | null // cena Auto1 z poprzedniej udanej nocy
 }
 
 // Zdjęcia i wyposażenie z pliku szczegoly.json, pobieranego dopiero przy pierwszym otwarciu auta.
@@ -47,6 +49,7 @@ export type Szczegoly = {
   parkHeating?: boolean
   pdc?: boolean
   sunroof?: boolean
+  prices?: [string, number | null, number | null][] // noc, Auto1 EUR, Otomoto PLN: tylko noce ze zmianą
 }
 
 export type Noc = {

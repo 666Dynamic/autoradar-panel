@@ -2,10 +2,12 @@ import * as React from "react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Card, CardAction, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { fmt } from "@/lib/auta"
-import type { Dane, Noc } from "@/lib/dane"
+import { fmt, powodBledu } from "@/lib/auta"
+import type { Auto, Dane, Noc } from "@/lib/dane"
 
 // Skan publikuje co noc; starsze dane znaczą, że ostatni się nie udał albo został zablokowany.
 const STALE_HOURS = 26
@@ -18,6 +20,41 @@ function dlugosc(start: string | null, koniec: string | null) {
   if (!start || !koniec) return "—"
   const minuty = Math.round((Date.parse(koniec) - Date.parse(start)) / 60000)
   return `${Math.floor(minuty / 60)} h ${minuty % 60} min`
+}
+
+// Auta, których Otomoto tej nocy nie dało porównać, i dlaczego.
+function Bledy({ auta }: { auta: Auto[] }) {
+  return (
+    <Dialog>
+      <DialogTrigger asChild><Button variant="ghost" size="sm">Pokaż</Button></DialogTrigger>
+      <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Błędy pobrania z Otomoto</DialogTitle>
+          <DialogDescription>Te auta są na liście bez porównania. Następna noc sprawdza je od nowa.</DialogDescription>
+        </DialogHeader>
+        <div className="overflow-x-auto rounded-lg border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Auto</TableHead>
+                <TableHead>Powód</TableHead>
+                <TableHead>Link</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {auta.map((r) => (
+                <TableRow key={r.id}>
+                  <TableCell className="whitespace-normal">{r.title || r.id}<div className="text-xs text-muted-foreground">{r.id}</div></TableCell>
+                  <TableCell className="whitespace-normal">{powodBledu(r.note)}</TableCell>
+                  <TableCell>{r.search_url ? <a className="underline" href={r.search_url} target="_blank" rel="noopener">Otomoto</a> : "—"}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
 }
 
 function Status({ noc }: { noc: Noc }) {
@@ -37,7 +74,7 @@ export function Home({ dane }: { dane: Dane }) {
     ["Kwalifikujące się", fmt(scan.qualified)],
     ["Błędy", fmt(scan.errors)],
     ["Bez modelu w Otomoto", fmt(scan.unmapped)],
-    ["Kurs NBP EUR", `${meta.rate} PLN`],
+    [`Kurs NBP EUR z ${dzien(meta.rate_date)}`, `${meta.rate} PLN`],
   ]
   return (
     <>
@@ -52,12 +89,12 @@ export function Home({ dane }: { dane: Dane }) {
           <Card key={opis}>
             <CardHeader>
               <CardDescription>{opis}</CardDescription>
+              {opis === "Błędy" && zBledem.length > 0 && <CardAction><Bledy auta={zBledem} /></CardAction>}
               <CardTitle className="text-xl font-semibold tabular-nums lg:text-2xl">{wartosc}</CardTitle>
             </CardHeader>
           </Card>
         ))}
       </div>
-      {zBledem.length > 0 && <p className="text-sm text-muted-foreground">Auta z błędem pobrania z Otomoto: {zBledem.map((r) => `${r.title} (${r.id})`).join(", ")}</p>}
       <div className="overflow-x-auto rounded-lg border">
         <Table>
           <TableHeader>

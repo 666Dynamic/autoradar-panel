@@ -65,7 +65,7 @@ export async function pobierzPaczke(auta: Wiersz[], postep: (gotowe: number, raz
     folder.file("oferta.txt", trescOferty(r, s))
     folder.file("whatsapp.txt", o?.whatsapp ?? tekstWhatsApp(r, s))
     folder.file("facebook.txt", o?.facebook ?? tekstFacebook(r, s))
-    const wybrane = o?.zdjecia ?? zdjeciaAuta(r, s)
+    const wybrane = o?.zdjecia?.length ? o.zdjecia : zdjeciaAuta(r, s) // nic nie wybrane: wszystkie
     wybrane.forEach((url, i) => zadania.push({ url, folder, plik: `${String(i + 1).padStart(2, "0")}.jpg` }))
   }
   zip.file("lista.xlsx", await lista(auta, szczegoly))

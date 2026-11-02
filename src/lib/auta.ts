@@ -71,6 +71,27 @@ export function noteLabel(n: string | null) {
   return m ? `model „${m[1]}” poza katalogiem filtrów` : "brak porównania"
 }
 
+const POWODY: Record<string, string> = {
+  "Incomplete page": "Otomoto zwróciło niepełną stronę wyników",
+  "Duplicate advert within a page": "ta sama oferta dwa razy na stronie wyników",
+  "Unexpected advert URL": "nietypowy link oferty w wynikach",
+  "Wrong sort order": "wyniki w złej kolejności",
+  "Unexpected pagination": "nietypowy podział wyników na strony",
+  "GraphQL returned errors": "Otomoto zwróciło błąd",
+  "Applied filters differ from requested filters": "Otomoto zmieniło filtry wyszukiwania",
+  timeout_240s: "brak odpowiedzi przez 4 minuty",
+  ValueError: "nieczytelna odpowiedź Otomoto",
+  URLError: "problem z połączeniem",
+  HTTPError: "problem z połączeniem",
+  TimeoutError: "brak odpowiedzi Otomoto",
+}
+
+// Dlaczego auto ma błąd: noc zapisuje powód po angielsku, strona pokazuje go po polsku.
+export function powodBledu(n: string | null) {
+  const powod = (n ?? "").replace(/^error:\s*/, "")
+  return POWODY[powod] ?? powod
+}
+
 export type Waluta = "eur" | "pln"
 export const kwota = (r: Auto, pole: "a" | "o" | "d" | "bid", w: Waluta) => r[`${pole}_${w}`]
 export const pieniadze = (n: number | null | undefined, w: Waluta) => (n === null || n === undefined ? "—" : `${fmt(n)} ${w === "eur" ? "€" : "zł"}`)
@@ -116,14 +137,20 @@ const specyfikacja = (r: Auto) => [
 
 export const specyfikacjaAuta = specyfikacja
 
-const WYPOSAZENIE: [keyof Szczegoly, string][] = [
-  ["allWheelDrive", "napęd 4x4"], ["ac", "klimatyzacja"], ["navigationSystem", "nawigacja"], ["leather", "skórzana tapicerka"],
-  ["heatedSeats", "podgrzewane fotele"], ["backupCamera", "kamera cofania"], ["pdc", "czujniki parkowania"],
-  ["sunroof", "szyberdach"], ["parkHeating", "ogrzewanie postojowe"],
+// Od najrzadszych w nocy 02.11: najpierw to, co wyróżnia auto. Lista Auto1 ma tylko te pola.
+const WYPOSAZENIE: [keyof Szczegoly, string, boolean][] = [
+  ["backupCamera", "kamera cofania", true], ["parkHeating", "ogrzewanie postojowe", true], ["allWheelDrive", "napęd 4x4", true],
+  ["sunroof", "szyberdach", true], ["leather", "skórzana tapicerka", true],
+  ["navigationSystem", "nawigacja", false], ["heatedSeats", "podgrzewane fotele", false], ["pdc", "czujniki parkowania", false], ["ac", "klimatyzacja", false],
 ]
 
 export function wyposazenie(s?: Szczegoly) {
   return s ? WYPOSAZENIE.filter(([k]) => s[k] === true).map(([, nazwa]) => nazwa) : []
+}
+
+// [nazwa, czy rzadkie]: rzadkie okno pokazuje wyraźniej.
+export function wyposazenieOkna(s?: Szczegoly) {
+  return s ? WYPOSAZENIE.filter(([k]) => s[k] === true).map(([, nazwa, rzadkie]): [string, boolean] => [nazwa, rzadkie]) : []
 }
 
 const KOLORY: Record<string, string> = { black: "czarny", gray: "szary", grey: "szary", white: "biały", silver: "srebrny", blue: "niebieski", red: "czerwony", green: "zielony", brown: "brązowy", beige: "beżowy", yellow: "żółty", orange: "pomarańczowy", gold: "złoty", purple: "fioletowy" }
@@ -134,13 +161,23 @@ export const dodatki = (s?: Szczegoly) => [
   ...(typeof s?.emissionStandard === "string" ? [["Norma emisji", s.emissionStandard]] : []),
 ]
 
-// Teksty bez ceny zakupu i bez linku do Auto1.
-export function tekstWhatsApp(r: Auto, s?: Szczegoly) {
+// Teksty bez ceny zakupu i bez linku do Auto1. Krótkie: dane w jednej linii, dodatki w drugiej.
+function linieOferty(r: Auto, s?: Szczegoly) {
   const sprzet = wyposazenie(s)
-  return [r.title, ...[...specyfikacja(r), ...dodatki(s)].filter(([, v]) => v !== "—").map(([k, v]) => `${k}: ${v}`), ...(sprzet.length ? [`Wyposażenie: ${sprzet.join(", ")}`] : [])].join("\n")
+  return [
+    specyfikacja(r).map(([, v]) => v).filter((v) => v !== "—").join(" · "),
+    dodatki(s).map(([k, v]) => `${k.toLowerCase()} ${v}`).join(" · "),
+    sprzet.length ? `Wyposażenie: ${sprzet.join(", ")}` : "",
+  ].filter(Boolean)
+}
+
+export function tekstWhatsApp(r: Auto, s?: Szczegoly) {
+  return [r.title, ...linieOferty(r, s)].join("\n")
 }
 
 export function tekstFacebook(r: Auto, s?: Szczegoly) {
-  const sprzet = wyposazenie(s)
-  return [`🚗 ${r.title}`, "", ...[...specyfikacja(r), ...dodatki(s)].filter(([, v]) => v !== "—").map(([k, v]) => `✅ ${k}: ${v}`), ...sprzet.map((x) => `✅ ${x}`), "", "Zainteresowany? Napisz wiadomość."].join("\n")
+  return [`🚗 ${r.title}`, ...linieOferty(r, s).map((x) => `✅ ${x}`), "Zainteresowany? Napisz wiadomość."].join("\n")
 }
+
+// Zmiana ceny Auto1 od poprzedniej udanej nocy, w euro; 0 gdy bez zmian albo bez historii.
+export const zmianaCeny = (r: Auto) => (r.a_prev_eur != null && r.a_eur != null ? Math.round(r.a_eur - r.a_prev_eur) : 0)

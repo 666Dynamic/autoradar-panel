@@ -263,7 +263,7 @@ export function Auto1({ dane }: { dane: Dane }) {
       </Tabs>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Input className="h-7 w-full sm:w-64" type="search" placeholder="Numer, marka, model" aria-label="Szukaj" value={tekst} onChange={(e) => { ustawTekst(e.target.value); pierwsza() }} />
+        <Input className="h-9 w-full sm:h-7 sm:w-64" type="search" placeholder="Numer, marka, model" aria-label="Szukaj" value={tekst} onChange={(e) => { ustawTekst(e.target.value); pierwsza() }} />
         <FiltrLista tytul="Typ aukcji" opcje={typy} wybrane={f.auction} zmien={(v) => pole("auction", v)} />
         <FiltrLista tytul="Paliwo" opcje={opcje("_fuel")} wybrane={f.fuel} zmien={(v) => pole("fuel", v)} />
         <FiltrLista tytul="Skrzynia" opcje={opcje("_gear")} wybrane={f.gear} zmien={(v) => pole("gear", v)} />

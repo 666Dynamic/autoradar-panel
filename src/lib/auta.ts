@@ -177,12 +177,12 @@ export function stawkaAkcyzy(r: Auto, ponad2l: boolean | null): number | null {
   return duzy ? 18.6 : 3.1
 }
 
-// Cennik Auto1 dla handlarzy z Polski, ważny od 01.01.2025, kwoty netto: obsługa auta, dokumenty krajowe, dokumenty międzynarodowe.
+// Cennik Auto1 dla handlarzy z Polski, ważny od 08.04.2026, kwoty netto: obsługa auta, dokumenty krajowe, dokumenty międzynarodowe.
 // Zależy od kraju, w którym stoi auto. Opłata aukcyjna (0–1 950 €) jest już w cenie Auto1, więc jej nie doliczamy.
-// Źródło: content.auto1.com/static/car_images/price_list_pl.pdf; opis w docs/results/OPLATY-auto1-2026-11-02.md (AutoRadar).
+// Źródło: content.auto1.com/static/car_images/price_list_pl_2026-04-08.pdf; opis w docs/results/OPLATY-auto1-2026-11-02.md (AutoRadar).
 const OPLATY_AUTO1: Record<string, [number, number, number]> = {
-  AT: [279, 149, 159], BE: [269, 109, 149], DE: [269, 109, 149], DK: [249, 119, 129], ES: [249, 189, 255], FI: [219, 109, 119],
-  FR: [289, 89, 99], IT: [209, 329, 389], NL: [249, 99, 195], PL: [149, 69, 99], PT: [179, 199, 199], SE: [272, 79, 159],
+  AT: [309, 159, 169], BE: [299, 119, 159], DE: [299, 119, 159], DK: [279, 129, 139], ES: [279, 199, 265], FI: [249, 119, 129],
+  FR: [319, 99, 109], IT: [239, 339, 399], NL: [279, 109, 205], PL: [179, 79, 109], PT: [209, 209, 209], SE: [302, 89, 169],
 }
 
 // Kraju spoza cennika (albo bez kraju w danych) nie zgadujemy po cichu: stawki DE i znacznik szacunku.

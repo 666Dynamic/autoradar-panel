@@ -210,7 +210,7 @@ function KosztCalkowity({ auto, s, waluta, kurs, ponad2l }: { auto: Wiersz; s?: 
       <p className="text-xs text-muted-foreground">
         {!oplaty.pewne && <><strong className="text-foreground">Szacunek, sprawdź w Auto1:</strong> {oplaty.kraj ? `brak stawek dla kraju ${oplaty.kraj}` : "brak kraju auta w danych"}, przyjęto stawki dla Niemiec. </>}
         {transport === null && <><strong className="text-foreground">Bez transportu</strong>: wpisz kwotę, zapamiętamy ją w tej przeglądarce dla wszystkich aut. </>}
-        Opłaty Auto1 wg cennika z 01.01.2025, netto, bez VAT, tak jak reszta cen. Opłata aukcyjna jest już w cenie Auto1. Ostateczna kwota jest na potwierdzeniu zakupu w Auto1.
+        Opłaty Auto1 wg cennika z 08.04.2026, netto, bez VAT, tak jak reszta cen. Opłata aukcyjna jest już w cenie Auto1. Ostateczna kwota jest na potwierdzeniu zakupu w Auto1.
       </p>
     </div>
   )

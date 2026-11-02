@@ -6,6 +6,7 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { wczytajDane, type Dane } from "@/lib/dane"
 import { Auto1 } from "@/pages/auto1"
 import { Home } from "@/pages/home"
+import { MojeAuta } from "@/pages/moje-auta"
 import { Wycena } from "@/pages/wycena"
 
 const zAdresu = () => {
@@ -38,7 +39,7 @@ export function App() {
 
   const [odwiedzone, ustawOdwiedzone] = React.useState(() => new Set([strona]))
   if (!odwiedzone.has(strona)) ustawOdwiedzone(new Set(odwiedzone).add(strona))
-  const wymagaDanych = strona !== "wycena"
+  const wymagaDanych = strona !== "wycena" && strona !== "moje-auta"
   return (
     <SidebarProvider style={{ "--sidebar-width": "calc(var(--spacing) * 56)", "--header-height": "calc(var(--spacing) * 12)" } as React.CSSProperties}>
       <AppSidebar strona={strona} variant="inset" />
@@ -51,6 +52,8 @@ export function App() {
           {/* Auto1 i Wycena zostają w pamięci, żeby filtry i wpisane dane przetrwały przejście między stronami. */}
           {dane && odwiedzone.has("auto1") && <div className={strona === "auto1" ? "flex min-w-0 flex-1 flex-col gap-4" : "hidden"}><Auto1 dane={dane} /></div>}
           {odwiedzone.has("wycena") && <div className={strona === "wycena" ? "contents" : "hidden"}><Wycena /></div>}
+          {/* Moje auta działają bez nocnych danych; z danymi numer Auto1 dostaje link. */}
+          {strona === "moje-auta" && <MojeAuta dane={dane} />}
         </main>
       </SidebarInset>
     </SidebarProvider>

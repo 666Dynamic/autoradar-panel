@@ -42,6 +42,7 @@ export type Szczegoly = {
   emissionStandard?: string | number
   city?: string
   country?: string
+  countryCode?: string // tak nazywa kraj nocny szczegoly.json
   allWheelDrive?: boolean
   ac?: boolean
   backupCamera?: boolean

@@ -9,12 +9,13 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-import { dodatki, endLabel, kwota, lokalizacja, offersLabel, pieniadze, specyfikacjaAuta, stawkaAkcyzy, tekstFacebook, tekstWhatsApp, wyposazenieOkna, type Waluta, type Wiersz } from "@/lib/auta"
+import { dodatki, endLabel, kwota, lokalizacja, offersLabel, oplatyAuto1, pieniadze, specyfikacjaAuta, stawkaAkcyzy, tekstFacebook, tekstWhatsApp, wyposazenieOkna, type Waluta, type Wiersz } from "@/lib/auta"
 import { wczytajSzczegoly, type Szczegoly } from "@/lib/dane"
 import { pobierzPaczke, zdjeciaAuta } from "@/lib/paczka"
-import { odczytajOferty, zapiszOferte } from "@/lib/pamiec"
+import { odczytajOferty, odczytajTransport, zapiszOferte, zapiszTransport } from "@/lib/pamiec"
 import { cn } from "@/lib/utils"
 
 const dzien = (d: string) => d.slice(8, 10) + "." + d.slice(5, 7)
@@ -154,8 +155,7 @@ function Obie({ auto, pole, waluta }: { auto: Wiersz; pole: "a" | "o" | "d" | "b
 }
 
 // Akcyza od ceny Auto1 w złotych, tylko informacyjnie. Gdy tytuł nie podaje pojemności, stawkę wybiera się tutaj.
-function Akcyza({ auto }: { auto: Wiersz }) {
-  const [ponad2l, ustaw] = React.useState<boolean | null>(null)
+function Akcyza({ auto, ponad2l, ustaw }: { auto: Wiersz; ponad2l: boolean | null; ustaw: (v: boolean) => void }) {
   const stawka = stawkaAkcyzy(auto, ponad2l)
   const wybor = auto.liters == null && auto.fuel !== "electro" && (
     <ToggleGroup type="single" variant="outline" size="sm" className="ml-auto" value={ponad2l === null ? "" : ponad2l ? "duzy" : "maly"} onValueChange={(v) => v && ustaw(v === "duzy")}>
@@ -172,12 +172,59 @@ function Akcyza({ auto }: { auto: Wiersz }) {
   )
 }
 
+// Ile naprawdę kosztuje auto z Auto1 w Polsce: cena (z opłatą aukcyjną) + stałe opłaty Auto1 + transport + akcyza.
+// Tylko informacja w oknie: nie zmienia różnicy w tabeli, progu ani kwalifikacji aut.
+function KosztCalkowity({ auto, s, waluta, kurs, ponad2l }: { auto: Wiersz; s?: Szczegoly; waluta: Waluta; kurs: number; ponad2l: boolean | null }) {
+  const [transport, ustawTransport] = React.useState(odczytajTransport)
+  const oplaty = oplatyAuto1(s)
+  const stawka = stawkaAkcyzy(auto, ponad2l)
+  const akcyzaEur = stawka === null || auto.a_pln === null ? null : auto.a_pln * stawka / 100 / kurs
+  const razemEur = auto.a_eur === null || akcyzaEur === null ? null : auto.a_eur + oplaty.obsluga + oplaty.dokumenty + (transport ?? 0) + akcyzaEur
+  const druga: Waluta = waluta === "eur" ? "pln" : "eur"
+  const w = (eur: number | null, wal: Waluta) => (eur === null ? null : wal === "eur" ? eur : eur * kurs)
+  const obie = (eur: number | null) => eur === null ? "—" : <><span className="whitespace-nowrap">{pieniadze(w(eur, waluta), waluta)}</span> <span className="whitespace-nowrap text-muted-foreground">· {pieniadze(w(eur, druga), druga)}</span></>
+  const roznicaEur = razemEur === null || auto.o_pln === null ? null : auto.o_pln / kurs - razemEur
+  const pole = (
+    <span className="flex items-center gap-1.5">
+      <Input type="number" inputMode="numeric" min={0} step={10} placeholder="wpisz" aria-label="Transport w euro" className="h-7 w-24 text-right"
+        value={transport ?? ""} onChange={(e) => {
+          const n = e.target.value === "" ? null : Math.max(0, Number(e.target.value))
+          ustawTransport(n)
+          zapiszTransport(n)
+        }} />
+      €
+    </span>
+  )
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border p-3">
+      <Lista tytul="Koszt całkowity" wiersze={[
+        ["Cena Auto1", obie(auto.a_eur)],
+        [`Obsługa Auto1${oplaty.kraj ? ` (${oplaty.kraj})` : ""}`, obie(oplaty.obsluga)],
+        [`Dokumenty (${oplaty.krajowe ? "krajowe" : "zagraniczne"})`, obie(oplaty.dokumenty)],
+        ["Transport", pole],
+        ["Akcyza", akcyzaEur === null ? <span className="text-muted-foreground">wybierz pojemność wyżej</span> : obie(akcyzaEur)],
+        ["Razem", <span key="r" className="font-medium">{obie(razemEur)}</span>],
+        ["Otomoto (średnia)", <Obie key="o" auto={auto} pole="o" waluta={waluta} />],
+        ["Różnica po kosztach", <span key="d" className={cn("font-medium", roznicaEur !== null && (roznicaEur >= 0 ? "text-success" : "text-destructive"))}>{obie(roznicaEur)}</span>],
+      ]} />
+      <p className="text-xs text-muted-foreground">
+        {!oplaty.pewne && <><strong className="text-foreground">Szacunek, sprawdź w Auto1:</strong> {oplaty.kraj ? `brak stawek dla kraju ${oplaty.kraj}` : "brak kraju auta w danych"}, przyjęto stawki dla Niemiec. </>}
+        {transport === null && <><strong className="text-foreground">Bez transportu</strong>: wpisz kwotę, zapamiętamy ją w tej przeglądarce dla wszystkich aut. </>}
+        Opłaty Auto1 wg cennika z 01.01.2025, netto, bez VAT, tak jak reszta cen. Opłata aukcyjna jest już w cenie Auto1. Ostateczna kwota jest na potwierdzeniu zakupu w Auto1.
+      </p>
+    </div>
+  )
+}
+
 export function OknoAuta({ auto, waluta, kurs, zamknij, widziany }: { auto: Wiersz | null; waluta: Waluta; kurs: number; zamknij: () => void; widziany: (id: string) => void }) {
   const [szczegoly, ustaw] = React.useState<Record<string, Szczegoly> | null>(null)
   React.useEffect(() => {
     if (auto) wczytajSzczegoly().then(ustaw)
   }, [auto])
   const s = auto ? szczegoly?.[auto.id] : undefined
+  // Wybór pojemności przy akcyzie liczy się też w koszcie całkowitym; nowe auto zaczyna bez wyboru.
+  const [wyborPojemnosci, ustawWybor] = React.useState<{ id: string; ponad2l: boolean } | null>(null)
+  const ponad2l = auto && wyborPojemnosci?.id === auto.id ? wyborPojemnosci.ponad2l : null
   const sprzet = wyposazenieOkna(s)
   return (
     <Dialog open={auto !== null} onOpenChange={(open) => !open && zamknij()}>
@@ -196,8 +243,9 @@ export function OknoAuta({ auto, waluta, kurs, zamknij, widziany }: { auto: Wier
                 ["Auto1", <Obie key="a" auto={auto} pole="a" waluta={waluta} />], ["Otomoto (średnia)", <Obie key="o" auto={auto} pole="o" waluta={waluta} />],
                 ["Różnica", <Obie key="d" auto={auto} pole="d" waluta={waluta} />], ["Próg", pieniadze(auto.t === null ? null : waluta === "eur" ? auto.t : auto.t * kurs, waluta)],
                 ["Ofert", offersLabel(auto)], ...(auto._dealer ? [["Licytuj do", <Obie key="bid" auto={auto} pole="bid" waluta={waluta} />] as [string, React.ReactNode]] : []),
-                ["Akcyza", <Akcyza key={auto.id} auto={auto} />]]} />
+                ["Akcyza", <Akcyza key={auto.id} auto={auto} ponad2l={ponad2l} ustaw={(v) => ustawWybor({ id: auto.id, ponad2l: v })} />]]} />
             </div>
+            <KosztCalkowity key={auto.id} auto={auto} s={s} waluta={waluta} kurs={kurs} ponad2l={ponad2l} />
             {sprzet.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {sprzet.map(([nazwa, rzadkie]) => <Badge key={nazwa} variant={rzadkie ? "secondary" : "outline"}>{nazwa}</Badge>)}

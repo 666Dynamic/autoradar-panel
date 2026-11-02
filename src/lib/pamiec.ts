@@ -35,3 +35,22 @@ export function zapiszOferte(id: string, zmiany: Oferta) {
     // bez pamięci strona działa dalej
   }
 }
+
+// Koszt transportu w euro, jeden dla wszystkich aut; ustawia właściciel w oknie auta.
+export function odczytajTransport(): number | null {
+  try {
+    const n = Number(localStorage.getItem("ar_transport_eur"))
+    return localStorage.getItem("ar_transport_eur") !== null && Number.isFinite(n) && n >= 0 ? n : null
+  } catch {
+    return null
+  }
+}
+
+export function zapiszTransport(eur: number | null) {
+  try {
+    if (eur === null) localStorage.removeItem("ar_transport_eur")
+    else localStorage.setItem("ar_transport_eur", String(eur))
+  } catch {
+    // bez pamięci strona działa dalej
+  }
+}

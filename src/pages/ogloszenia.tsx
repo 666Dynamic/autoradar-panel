@@ -11,7 +11,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Wybor } from "@/components/wybor"
 import { FUEL, GEAR, wyposazenie } from "@/lib/auta"
 import { wczytajSzczegoly, type Dane } from "@/lib/dane"
-import { KRAJE_OGLOSZEN, POLA_OGLOSZENIA, WZORY, ogloszenie, type Ogloszenie } from "@/lib/ogloszenia"
+import { KRAJE_OGLOSZEN, POLA_OGLOSZENIA, WZORY, ogloszenie, rozpoznajTekst, type Ogloszenie } from "@/lib/ogloszenia"
 
 const PALIWA: [string, string][] = ["Diesel", "Benzyna", "Hybryda", "Hybryda plug-in", "Elektryczny", "Benzyna + LPG"].map((x) => [x, x])
 const SKRZYNIE: [string, string][] = [["Automat", "Automat"], ["Manualna", "Manualna"]]
@@ -37,6 +37,7 @@ export function Ogloszenia({ dane }: { dane: Dane | null }) {
   const [o, ustawO] = React.useState(szkic.pola)
   const [wzor, ustawWzor] = React.useState(szkic.wzor)
   const [numer, ustawNumer] = React.useState("")
+  const [wklejony, ustawWklejony] = React.useState("")
   const [skopiowano, ustawSkopiowano] = React.useState(false)
   const tekst = ogloszenie(o, wzor)
 
@@ -74,6 +75,15 @@ export function Ogloszenia({ dane }: { dane: Dane | null }) {
     toast.success("Wczytano dane auta. Dopisz cenę i VIN.")
   }
 
+  const rozpoznaj = () => {
+    const w = rozpoznajTekst(wklejony)
+    const ile = Object.keys(w).filter((k) => k !== "waluta").length
+    if (!ile) return toast.error("Nie rozpoznałem żadnych danych. Wpisz je ręcznie.")
+    ustawO((x) => ({ ...POLA_OGLOSZENIA, kontakt: x.kontakt, waluta: x.waluta, kraj: x.kraj, ...w }))
+    ustawWklejony("")
+    toast.success("Uzupełniono dane z tekstu. Sprawdź je i dopisz brakujące.")
+  }
+
   const kopiuj = () => navigator.clipboard.writeText(tekst).then(() => {
     ustawSkopiowano(true)
     setTimeout(() => ustawSkopiowano(false), 1500)
@@ -87,6 +97,10 @@ export function Ogloszenia({ dane }: { dane: Dane | null }) {
           <CardDescription>Puste pola nie pojawią się w ogłoszeniu.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <Textarea rows={3} aria-label="Wklejony tekst" placeholder={"Wklej tekst auta, np. od kontrahenta:\n2017-02-07 · PHEV · Volkswagen · Passat · VIN · przebieg · cena"} value={wklejony} onChange={(e) => ustawWklejony(e.target.value)} />
+            <Button className="self-start" onClick={rozpoznaj} disabled={!wklejony.trim()}>Uzupełnij z tekstu</Button>
+          </div>
           <div className="flex gap-2">
             <Input placeholder="Numer Auto1, np. AB12345" aria-label="Numer Auto1" value={numer} onChange={(e) => ustawNumer(e.target.value)} onKeyDown={(e) => e.key === "Enter" && wczytaj()} />
             <Button variant="outline" onClick={wczytaj} disabled={!numer.trim()}>Wczytaj z Auto1</Button>

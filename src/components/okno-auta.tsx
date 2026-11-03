@@ -1,5 +1,5 @@
 import * as React from "react"
-import { CheckIcon, CopyIcon, DownloadIcon } from "lucide-react"
+import { CheckIcon, CopyIcon, DownloadIcon, ExternalLinkIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
@@ -147,66 +147,86 @@ function Lista({ tytul, wiersze }: { tytul: string; wiersze: [string, React.Reac
   )
 }
 
-// Kwota w wybranej walucie, obok w drugiej.
-function Obie({ auto, pole, waluta }: { auto: Wiersz; pole: "a" | "o" | "d" | "bid"; waluta: Waluta }) {
-  const druga: Waluta = waluta === "eur" ? "pln" : "eur"
-  if (kwota(auto, pole, waluta) == null) return "—"
-  return <>{pieniadze(kwota(auto, pole, waluta), waluta)} <span className="text-muted-foreground">· {pieniadze(kwota(auto, pole, druga), druga)}</span></>
+const druga = (waluta: Waluta): Waluta => (waluta === "eur" ? "pln" : "eur")
+const kolor = (n: number | null) => (n === null ? "" : n >= 0 ? "text-success" : "text-destructive")
+
+// Jedna z trzech głównych liczb na górze okna: duża w wybranej walucie, pod nią mała w drugiej.
+function Liczba({ tytul, opis, glowna, mala, className }: { tytul: string; opis?: string; glowna: string; mala?: string; className?: string }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-0.5 rounded-lg border p-2.5 sm:p-3">
+      <span className="truncate text-xs text-muted-foreground">{tytul}{opis && <span className="max-sm:hidden"> · {opis}</span>}</span>
+      <span className={cn("text-base font-semibold tabular-nums whitespace-nowrap sm:text-xl", className)}>{glowna}</span>
+      {mala && <span className="text-xs text-muted-foreground tabular-nums whitespace-nowrap">{mala}</span>}
+    </div>
+  )
 }
 
-// Akcyza od ceny Auto1 w złotych, tylko informacyjnie. Gdy tytuł nie podaje pojemności, stawkę wybiera się tutaj.
-function Akcyza({ auto, ponad2l, ustaw }: { auto: Wiersz; ponad2l: boolean | null; ustaw: (v: boolean) => void }) {
-  const stawka = stawkaAkcyzy(auto, ponad2l)
-  const wybor = auto.liters == null && auto.fuel !== "electro" && (
-    <ToggleGroup type="single" variant="outline" size="sm" className="ml-auto" value={ponad2l === null ? "" : ponad2l ? "duzy" : "maly"} onValueChange={(v) => v && ustaw(v === "duzy")}>
-      <ToggleGroupItem value="maly">do 2,0 l</ToggleGroupItem>
-      <ToggleGroupItem value="duzy">ponad 2,0 l</ToggleGroupItem>
-    </ToggleGroup>
-  )
-  if (stawka === null || auto.a_pln === null) return wybor || "—"
+function Ceny({ auto, waluta }: { auto: Wiersz; waluta: Waluta }) {
+  const d = kwota(auto, "d", waluta) ?? null
+  const plus = (n: number | null, w: Waluta) => (n !== null && n > 0 ? "+" : "") + pieniadze(n, w)
   return (
-    <span className="flex flex-col items-end gap-1">
-      <span>{pieniadze(auto.a_pln * stawka / 100, "pln")} <span className="text-muted-foreground">· {String(stawka).replace(".", ",")}%</span></span>
-      {wybor}
-    </span>
+    <div className="grid grid-cols-3 gap-2">
+      <Liczba tytul="Auto1" glowna={pieniadze(kwota(auto, "a", waluta), waluta)} mala={pieniadze(kwota(auto, "a", druga(waluta)), druga(waluta))} />
+      <Liczba tytul="Otomoto" opis={auto.compared ? `średnia z ${auto.compared}` : undefined} glowna={pieniadze(kwota(auto, "o", waluta), waluta)} mala={pieniadze(kwota(auto, "o", druga(waluta)), druga(waluta))} />
+      <Liczba tytul="Różnica" glowna={plus(d, waluta)} mala={plus(kwota(auto, "d", druga(waluta)) ?? null, druga(waluta))} className={kolor(d)} />
+    </div>
   )
 }
 
 // Ile naprawdę kosztuje auto z Auto1 w Polsce: cena (z opłatą aukcyjną) + stałe opłaty Auto1 + transport + akcyza.
-// Tylko informacja w oknie: nie zmienia różnicy w tabeli, progu ani kwalifikacji aut.
-function KosztCalkowity({ auto, s, waluta, kurs, ponad2l }: { auto: Wiersz; s?: Szczegoly; waluta: Waluta; kurs: number; ponad2l: boolean | null }) {
+// Tylko informacja w oknie: nie zmienia różnicy w tabeli, progu ani kwalifikacji aut. Akcyza liczona od ceny w złotych.
+function KosztCalkowity({ auto, s, waluta, kurs }: { auto: Wiersz; s?: Szczegoly; waluta: Waluta; kurs: number }) {
   const [transport, ustawTransport] = React.useState(odczytajTransport)
+  // Gdy tytuł nie podaje pojemności, stawkę akcyzy wybiera się tutaj.
+  const [ponad2l, ustawPonad2l] = React.useState<boolean | null>(null)
   const oplaty = oplatyAuto1(s)
   const stawka = stawkaAkcyzy(auto, ponad2l)
   const akcyzaEur = stawka === null || auto.a_pln === null ? null : auto.a_pln * stawka / 100 / kurs
   const razemEur = auto.a_eur === null || akcyzaEur === null ? null : auto.a_eur + oplaty.obsluga + oplaty.dokumenty + (transport ?? 0) + akcyzaEur
-  const druga: Waluta = waluta === "eur" ? "pln" : "eur"
-  const w = (eur: number | null, wal: Waluta) => (eur === null ? null : wal === "eur" ? eur : eur * kurs)
-  const obie = (eur: number | null) => eur === null ? "—" : <><span className="whitespace-nowrap">{pieniadze(w(eur, waluta), waluta)}</span> <span className="whitespace-nowrap text-muted-foreground">· {pieniadze(w(eur, druga), druga)}</span></>
   const roznicaEur = razemEur === null || auto.o_pln === null ? null : auto.o_pln / kurs - razemEur
-  const pole = (
-    <span className="flex items-center gap-1.5">
-      <Input type="number" inputMode="numeric" min={0} step={10} placeholder="wpisz" aria-label="Transport w euro" className="h-7 w-24 text-right"
-        value={transport ?? ""} onChange={(e) => {
-          const n = e.target.value === "" ? null : Math.max(0, Number(e.target.value))
-          ustawTransport(n)
-          zapiszTransport(n)
-        }} />
-      €
-    </span>
+  const w = (eur: number | null, wal: Waluta = waluta) => (eur === null ? null : wal === "eur" ? eur : eur * kurs)
+  const k = (eur: number | null) => pieniadze(w(eur), waluta)
+  const wyborPojemnosci = auto.liters == null && auto.fuel !== "electro" && (
+    <ToggleGroup type="single" variant="outline" size="sm" value={ponad2l === null ? "" : ponad2l ? "duzy" : "maly"} onValueChange={(v) => v && ustawPonad2l(v === "duzy")}>
+      <ToggleGroupItem value="maly">do 2,0 l</ToggleGroupItem>
+      <ToggleGroupItem value="duzy">ponad 2,0 l</ToggleGroupItem>
+    </ToggleGroup>
+  )
+  const wiersz = (nazwa: React.ReactNode, wartosc: React.ReactNode, className?: string) => (
+    <div className={cn("flex min-h-7 items-center justify-between gap-3", className)}>
+      <dt className="text-muted-foreground">{nazwa}</dt>
+      <dd className="text-right tabular-nums whitespace-nowrap">{wartosc}</dd>
+    </div>
   )
   return (
     <div className="flex flex-col gap-2 rounded-lg border p-3">
-      <Lista tytul="Koszt całkowity" wiersze={[
-        ["Cena Auto1", obie(auto.a_eur)],
-        [`Obsługa Auto1${oplaty.kraj ? ` (${oplaty.kraj})` : ""}`, obie(oplaty.obsluga)],
-        [`Dokumenty (${oplaty.krajowe ? "krajowe" : "zagraniczne"})`, obie(oplaty.dokumenty)],
-        ["Transport", pole],
-        ["Akcyza", akcyzaEur === null ? <span className="text-muted-foreground">wybierz pojemność wyżej</span> : obie(akcyzaEur)],
-        ["Razem", <span key="r" className="font-medium">{obie(razemEur)}</span>],
-        ["Otomoto (średnia)", <Obie key="o" auto={auto} pole="o" waluta={waluta} />],
-        ["Różnica po kosztach", <span key="d" className={cn("font-medium", roznicaEur !== null && (roznicaEur >= 0 ? "text-success" : "text-destructive"))}>{obie(roznicaEur)}</span>],
-      ]} />
+      <h3 className="text-sm font-medium">Koszt całkowity</h3>
+      <dl className="flex flex-col gap-0.5 text-sm">
+        {wiersz("Cena Auto1", k(auto.a_eur))}
+        {wiersz(`Obsługa Auto1${oplaty.kraj ? ` (${oplaty.kraj})` : ""}`, k(oplaty.obsluga))}
+        {wiersz(`Dokumenty (${oplaty.krajowe ? "krajowe" : "zagraniczne"})`, k(oplaty.dokumenty))}
+        {wiersz("Transport", (
+          <span className="flex items-center gap-1.5">
+            <Input type="number" inputMode="numeric" min={0} step={10} placeholder="wpisz" aria-label="Transport w euro" className="h-7 w-24 text-right"
+              value={transport ?? ""} onChange={(e) => {
+                const n = e.target.value === "" ? null : Math.max(0, Number(e.target.value))
+                ustawTransport(n)
+                zapiszTransport(n)
+              }} />
+            €
+          </span>
+        ))}
+        {wiersz(<>Akcyza{stawka !== null && ` ${String(stawka).replace(".", ",")}%`}</>, akcyzaEur === null ? <span className="text-muted-foreground">wybierz pojemność</span> : k(akcyzaEur))}
+        {wyborPojemnosci && <div className="flex justify-end">{wyborPojemnosci}</div>}
+        {wiersz("Razem koszt", k(razemEur), "mt-1 border-t pt-1.5 font-medium [&_dt]:text-foreground")}
+        {wiersz("Otomoto (średnia)", pieniadze(kwota(auto, "o", waluta), waluta))}
+        {wiersz("Różnica po kosztach", (
+          <span className="flex flex-col items-end">
+            <span className={cn("text-base font-semibold", kolor(roznicaEur))}>{k(roznicaEur)}</span>
+            {roznicaEur !== null && <span className="text-xs text-muted-foreground">{pieniadze(w(roznicaEur, druga(waluta)), druga(waluta))}</span>}
+          </span>
+        ), "mt-1 border-t pt-1.5 font-medium [&_dt]:text-foreground")}
+      </dl>
       <p className="text-xs text-muted-foreground">
         {!oplaty.pewne && <><strong className="text-foreground">Szacunek, sprawdź w Auto1:</strong> {oplaty.kraj ? `brak stawek dla kraju ${oplaty.kraj}` : "brak kraju auta w danych"}, przyjęto stawki dla Niemiec. </>}
         {transport === null && <><strong className="text-foreground">Bez transportu</strong>: wpisz kwotę, zapamiętamy ją w tej przeglądarce dla wszystkich aut. </>}
@@ -222,9 +242,6 @@ export function OknoAuta({ auto, waluta, kurs, zamknij, widziany }: { auto: Wier
     if (auto) wczytajSzczegoly().then(ustaw)
   }, [auto])
   const s = auto ? szczegoly?.[auto.id] : undefined
-  // Wybór pojemności przy akcyzie liczy się też w koszcie całkowitym; nowe auto zaczyna bez wyboru.
-  const [wyborPojemnosci, ustawWybor] = React.useState<{ id: string; ponad2l: boolean } | null>(null)
-  const ponad2l = auto && wyborPojemnosci?.id === auto.id ? wyborPojemnosci.ponad2l : null
   const sprzet = wyposazenieOkna(s)
   return (
     <Dialog open={auto !== null} onOpenChange={(open) => !open && zamknij()}>
@@ -235,28 +252,28 @@ export function OknoAuta({ auto, waluta, kurs, zamknij, widziany }: { auto: Wier
               <DialogTitle className="pr-6">{auto.title || auto.id}</DialogTitle>
               <DialogDescription>{auto.id}{auto.unroadworthy ? " · niezdatne do jazdy" : ""}</DialogDescription>
             </DialogHeader>
+            <div className="flex flex-wrap gap-2">
+              {auto.auto1_url && <Button asChild variant="outline" size="sm" className="flex-1"><a href={auto.auto1_url} target="_blank" rel="noopener">Auto1<ExternalLinkIcon /></a></Button>}
+              {auto.search_url && <Button asChild variant="outline" size="sm" className="flex-1"><a href={auto.search_url} target="_blank" rel="noopener" onClick={() => widziany(auto.id)}>Otomoto<ExternalLinkIcon /></a></Button>}
+              {s?.report && <Button asChild variant="outline" size="sm" className="flex-1"><a href={s.report} target="_blank" rel="noopener">Raport<ExternalLinkIcon /></a></Button>}
+            </div>
+            <Ceny auto={auto} waluta={waluta} />
             {szczegoly ? <Zdjecia key={`zdjecia-${auto.id}`} auto={auto} zdjecia={zdjeciaAuta(auto, s)} /> : <p className="text-sm text-muted-foreground">Wczytuję zdjęcia…</p>}
             <div className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
-              <Lista tytul="Auto" wiersze={[...specyfikacjaAuta(auto), ...dodatki(s), ["Lokalizacja", lokalizacja(s)], ["Typ aukcji", auto._label],
-                ...(auto.end_ms != null ? [["Koniec aukcji", endLabel(auto)] as [string, string]] : [])]} />
-              <Lista tytul="Ceny i koszty" wiersze={[
-                ["Auto1", <Obie key="a" auto={auto} pole="a" waluta={waluta} />], ["Otomoto (średnia)", <Obie key="o" auto={auto} pole="o" waluta={waluta} />],
-                ["Różnica", <Obie key="d" auto={auto} pole="d" waluta={waluta} />], ["Próg", pieniadze(auto.t === null ? null : waluta === "eur" ? auto.t : auto.t * kurs, waluta)],
-                ["Ofert", offersLabel(auto)], ...(auto._dealer ? [["Licytuj do", <Obie key="bid" auto={auto} pole="bid" waluta={waluta} />] as [string, React.ReactNode]] : []),
-                ["Akcyza", <Akcyza key={auto.id} auto={auto} ponad2l={ponad2l} ustaw={(v) => ustawWybor({ id: auto.id, ponad2l: v })} />]]} />
+              <Lista tytul="Auto" wiersze={[...specyfikacjaAuta(auto), ...dodatki(s), ["Lokalizacja", lokalizacja(s)]]} />
+              <Lista tytul="Aukcja" wiersze={[["Typ aukcji", auto._label],
+                ...(auto.end_ms != null ? [["Koniec aukcji", endLabel(auto)] as [string, string]] : []),
+                ...(auto._dealer ? [["Licytuj do", pieniadze(kwota(auto, "bid", waluta), waluta)] as [string, string]] : []),
+                ["Próg różnicy", pieniadze(auto.t === null ? null : waluta === "eur" ? auto.t : auto.t * kurs, waluta)],
+                ["Ofert Otomoto", offersLabel(auto)]]} />
             </div>
-            <KosztCalkowity key={`koszt-${auto.id}`} auto={auto} s={s} waluta={waluta} kurs={kurs} ponad2l={ponad2l} />
+            <KosztCalkowity key={`koszt-${auto.id}`} auto={auto} s={s} waluta={waluta} kurs={kurs} />
             {sprzet.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {sprzet.map(([nazwa, rzadkie]) => <Badge key={nazwa} variant={rzadkie ? "secondary" : "outline"}>{nazwa}</Badge>)}
               </div>
             )}
             {s?.prices?.length ? <HistoriaCeny ceny={s.prices} waluta={waluta} kurs={kurs} /> : null}
-            <div className="flex flex-wrap gap-2">
-              {auto.auto1_url && <Button asChild variant="outline" className="flex-1"><a href={auto.auto1_url} target="_blank" rel="noopener">Auto1</a></Button>}
-              {auto.search_url && <Button asChild variant="outline" className="flex-1"><a href={auto.search_url} target="_blank" rel="noopener" onClick={() => widziany(auto.id)}>Otomoto</a></Button>}
-              {s?.report && <Button asChild variant="outline" className="flex-1"><a href={s.report} target="_blank" rel="noopener">Raport</a></Button>}
-            </div>
             {szczegoly && (
               <Tabs key={`teksty-${auto.id}`} defaultValue="whatsapp">
                 <TabsList>

@@ -12,13 +12,13 @@ import { cn } from "@/lib/utils"
 
 function Przycisk({ tytul, wybrane, ...reszta }: { tytul: string; wybrane: string[] } & React.ComponentProps<typeof Button>) {
   return (
-    <Button variant="outline" size="sm" className="border-dashed" {...reszta}>
+    <Button variant="outline" size="sm" className={wybrane.length ? "border-primary" : "border-dashed"} {...reszta}>
       <PlusCircleIcon />
       {tytul}
       {wybrane.length > 0 && (
         <>
           <Separator orientation="vertical" className="mx-1 data-[orientation=vertical]:h-4" />
-          {wybrane.length > 2 ? <Badge variant="secondary">{wybrane.length}</Badge> : wybrane.map((w) => <Badge key={w} variant="secondary">{w}</Badge>)}
+          {wybrane.length > 2 ? <Badge>{wybrane.length}</Badge> : wybrane.map((w) => <Badge key={w}>{w}</Badge>)}
         </>
       )}
     </Button>

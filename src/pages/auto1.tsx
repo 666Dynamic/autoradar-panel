@@ -87,10 +87,14 @@ function Roznica({ r, waluta, kurs }: { r: Wiersz; waluta: Waluta; kurs: number 
 }
 
 // Podgląd zamyka się przy kliknięciu: otwarte okno auta zasłania wiersz i podgląd nie dostałby zdarzenia wyjścia myszy.
+// Otwarte okno auta: podgląd zdjęcia, którego opóźnienie minęło już po kliknięciu, nie wychodzi nad okno.
+const OknoOtwarte = React.createContext(false)
+
 function Nazwa({ r, otworz }: { r: Wiersz; otworz: (r: Wiersz) => void }) {
   const [podglad, ustawPodglad] = React.useState(false)
+  const okno = React.useContext(OknoOtwarte)
   return (
-    <HoverCard open={podglad} onOpenChange={ustawPodglad} openDelay={200} closeDelay={0}>
+    <HoverCard open={podglad && !okno} onOpenChange={(v) => ustawPodglad(v && !okno)} openDelay={200} closeDelay={0}>
       <HoverCardTrigger asChild>
         <button className="inline text-left font-medium hover:underline" onClick={() => { ustawPodglad(false); otworz(r) }}>{r.title || r.id}</button>
       </HoverCardTrigger>
@@ -310,7 +314,7 @@ export function Auto1({ dane }: { dane: Dane }) {
       {wTelefonie ? (
         <div ref={poczatekListy} className="flex scroll-mt-16 flex-col gap-3">
           {wiersze.map(({ original: r }) => (
-            <Card key={r.id} className={widziane.has(r.id) ? "opacity-60" : undefined}>
+            <Card key={r.id} className={cn(widziane.has(r.id) && "opacity-60", zaznaczone[r.id] && "ring-2 ring-primary")}>
               <CardContent className="flex flex-col gap-2">
                 <div className="flex items-start gap-2">
                   <Checkbox className="mt-1" aria-label={`Zaznacz ${r.id}`} checked={!!zaznaczone[r.id]} onCheckedChange={(v) => tabela.getRow(r.id).toggleSelected(v === true)} />
@@ -338,6 +342,7 @@ export function Auto1({ dane }: { dane: Dane }) {
       ) : (
         <div ref={poczatekListy} className="scroll-mt-16 rounded-lg border [&>[data-slot=table-container]]:max-h-[calc(100svh-5rem)] [&>[data-slot=table-container]]:overflow-auto">
           <Sortowanie.Provider value={sortowanie}>
+            <OknoOtwarte.Provider value={otwarte !== null}>
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-background">
                 {tabela.getHeaderGroups().map((g) => (
@@ -355,6 +360,7 @@ export function Auto1({ dane }: { dane: Dane }) {
                 {lista.length === 0 && <TableRow><TableCell colSpan={tabela.getVisibleLeafColumns().length} className="h-24 text-center text-muted-foreground">Brak aut dla tych filtrów.</TableCell></TableRow>}
               </TableBody>
             </Table>
+            </OknoOtwarte.Provider>
           </Sortowanie.Provider>
         </div>
       )}

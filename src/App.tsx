@@ -7,6 +7,7 @@ import { wczytajDane, type Dane } from "@/lib/dane"
 import { Auto1 } from "@/pages/auto1"
 import { Home } from "@/pages/home"
 import { MojeAuta } from "@/pages/moje-auta"
+import { Ogloszenia } from "@/pages/ogloszenia"
 import { Wycena } from "@/pages/wycena"
 
 const zAdresu = () => {
@@ -39,7 +40,7 @@ export function App() {
 
   const [odwiedzone, ustawOdwiedzone] = React.useState(() => new Set([strona]))
   if (!odwiedzone.has(strona)) ustawOdwiedzone(new Set(odwiedzone).add(strona))
-  const wymagaDanych = strona !== "wycena" && strona !== "moje-auta"
+  const wymagaDanych = strona !== "wycena" && strona !== "moje-auta" && strona !== "ogloszenia"
   return (
     <SidebarProvider style={{ "--sidebar-width": "calc(var(--spacing) * 56)", "--header-height": "calc(var(--spacing) * 12)" } as React.CSSProperties}>
       <AppSidebar strona={strona} variant="inset" />
@@ -54,6 +55,8 @@ export function App() {
           {odwiedzone.has("wycena") && <div className={strona === "wycena" ? "contents" : "hidden"}><Wycena /></div>}
           {/* Moje auta działają bez nocnych danych; z danymi numer Auto1 dostaje link. */}
           {strona === "moje-auta" && <MojeAuta dane={dane} />}
+          {/* Ogłoszenia też bez nocnych danych; z danymi można wczytać auto po numerze. */}
+          {strona === "ogloszenia" && <Ogloszenia dane={dane} />}
         </main>
       </SidebarInset>
     </SidebarProvider>

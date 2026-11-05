@@ -1,5 +1,5 @@
 import * as React from "react"
-import { CheckIcon, CopyIcon, DownloadIcon, ExternalLinkIcon, MegaphoneIcon } from "lucide-react"
+import { CheckIcon, CopyIcon, DownloadIcon, ExternalLinkIcon, FolderOpenIcon, MegaphoneIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
@@ -13,9 +13,10 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { dodatki, endLabel, kwota, lokalizacja, offersLabel, oplatyAuto1, pieniadze, specyfikacjaAuta, stawkaAkcyzy, tekstFacebook, tekstWhatsApp, wyposazenieOkna, type Waluta, type Wiersz } from "@/lib/auta"
+import { MARZA, OPIS_TYPU, doOgloszenia, type AutoDania } from "@/lib/dania"
 import { wczytajSzczegoly, type Szczegoly } from "@/lib/dane"
 import { linkMobile } from "@/lib/mobile"
-import { zrobOgloszenie } from "@/lib/ogloszenia"
+import { ogloszenie, zrobOgloszenie } from "@/lib/ogloszenia"
 import { pobierzPaczke, zdjeciaAuta } from "@/lib/paczka"
 import { odczytajOferty, odczytajTransport, zapiszOferte, zapiszTransport } from "@/lib/pamiec"
 import { cn } from "@/lib/utils"
@@ -168,7 +169,7 @@ function Ceny({ auto, waluta }: { auto: Wiersz; waluta: Waluta }) {
   const plus = (n: number | null, w: Waluta) => (n !== null && n > 0 ? "+" : "") + pieniadze(n, w)
   return (
     <div className="grid grid-cols-3 gap-2">
-      <Liczba tytul="Auto1" glowna={pieniadze(kwota(auto, "a", waluta), waluta)} mala={pieniadze(kwota(auto, "a", druga(waluta)), druga(waluta))} />
+      <Liczba tytul={auto.dania ? "Dostawca" : "Auto1"} opis={auto.dania?.typCeny ?? undefined} glowna={pieniadze(kwota(auto, "a", waluta), waluta)} mala={pieniadze(kwota(auto, "a", druga(waluta)), druga(waluta))} />
       <Liczba tytul="Otomoto" opis={auto.compared ? `średnia z ${auto.compared}` : undefined} glowna={pieniadze(kwota(auto, "o", waluta), waluta)} mala={pieniadze(kwota(auto, "o", druga(waluta)), druga(waluta))} />
       <Liczba tytul="Różnica" glowna={plus(d, waluta)} mala={plus(kwota(auto, "d", druga(waluta)) ?? null, druga(waluta))} className={kolor(d)} />
     </div>
@@ -238,11 +239,38 @@ function KosztCalkowity({ auto, s, waluta, kurs }: { auto: Wiersz; s?: Szczegoly
   )
 }
 
+// Dania: gotowy post do ręcznej publikacji (cena dostawcy + marża) i zdjęcia z folderu dostawcy.
+// Tekst można poprawić; zostaje w tej przeglądarce jak teksty aut z Auto1.
+function PostDania({ auto }: { auto: AutoDania }) {
+  const o = doOgloszenia(auto)
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border p-3">
+      <h3 className="text-sm font-medium">Post</h3>
+      <Tabs defaultValue="facebook">
+        <TabsList>
+          <TabsTrigger value="facebook">Możliwość sprowadzenia</TabsTrigger>
+          <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
+        </TabsList>
+        <TabsContent value="facebook"><Tekst id={auto.id} rodzaj="facebook" domyslny={ogloszenie(o, "zamowienie")} /></TabsContent>
+        <TabsContent value="whatsapp"><Tekst id={auto.id} rodzaj="whatsapp" domyslny={ogloszenie(o, "whatsapp")} /></TabsContent>
+      </Tabs>
+      <div className="flex flex-wrap gap-2">
+        {auto.dania.zip && <Button asChild size="sm" className="flex-1"><a href={auto.dania.zip} download><DownloadIcon />Pobierz zdjęcia</a></Button>}
+        {auto.dania.folder && <Button asChild variant="outline" size="sm" className="flex-1"><a href={auto.dania.folder} target="_blank" rel="noopener"><FolderOpenIcon />Folder zdjęć</a></Button>}
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Cena w poście: cena dostawcy + {pieniadze(MARZA, "eur")}.{!auto.dania.folder && " Dostawca nie podał folderu zdjęć."}
+      </p>
+    </div>
+  )
+}
+
 export function OknoAuta({ auto, waluta, kurs, zamknij, widziany }: { auto: Wiersz | null; waluta: Waluta; kurs: number; zamknij: () => void; widziany: (id: string) => void }) {
   const [szczegoly, ustaw] = React.useState<Record<string, Szczegoly> | null>(null)
   React.useEffect(() => {
-    if (auto) wczytajSzczegoly().then(ustaw)
+    if (auto && !auto.dania) wczytajSzczegoly().then(ustaw) // Dania nie ma szczegoly.json
   }, [auto])
+  const dk = auto?.dania ? (auto as AutoDania) : null
   const s = auto ? szczegoly?.[auto.id] : undefined
   const mobile = auto ? linkMobile(auto) : null
   const sprzet = wyposazenieOkna(s)
@@ -260,26 +288,34 @@ export function OknoAuta({ auto, waluta, kurs, zamknij, widziany }: { auto: Wier
               {auto.search_url && <Button asChild variant="outline" size="sm" className="flex-1"><a href={auto.search_url} target="_blank" rel="noopener" onClick={() => widziany(auto.id)}>Otomoto<ExternalLinkIcon /></a></Button>}
               {mobile && <Button asChild variant="outline" size="sm" className="flex-1"><a href={mobile} target="_blank" rel="noopener">mobile.de<ExternalLinkIcon /></a></Button>}
               {s?.report && <Button asChild variant="outline" size="sm" className="flex-1"><a href={s.report} target="_blank" rel="noopener">Raport<ExternalLinkIcon /></a></Button>}
-              <Button size="sm" className="flex-1" onClick={() => { zamknij(); zrobOgloszenie(auto.id) }}><MegaphoneIcon />Zrób ogłoszenie</Button>
+              {!dk && <Button size="sm" className="flex-1" onClick={() => { zamknij(); zrobOgloszenie(auto.id) }}><MegaphoneIcon />Zrób ogłoszenie</Button>}
             </div>
             <Ceny auto={auto} waluta={waluta} />
-            {szczegoly ? <Zdjecia key={`zdjecia-${auto.id}`} auto={auto} zdjecia={zdjeciaAuta(auto, s)} /> : <p className="text-sm text-muted-foreground">Wczytuję zdjęcia…</p>}
+            {dk ? (auto.image ? <img src={auto.image} alt={auto.title} className="mx-auto max-h-[38svh] rounded-lg object-contain" /> : <p className="text-sm text-muted-foreground">Brak zdjęcia głównego, zdjęcia są w folderze dostawcy.</p>)
+              : szczegoly ? <Zdjecia key={`zdjecia-${auto.id}`} auto={auto} zdjecia={zdjeciaAuta(auto, s)} /> : <p className="text-sm text-muted-foreground">Wczytuję zdjęcia…</p>}
             <div className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
-              <Lista tytul="Auto" wiersze={[...specyfikacjaAuta(auto), ...dodatki(s), ["Lokalizacja", lokalizacja(s)]]} />
-              <Lista tytul="Aukcja" wiersze={[["Typ aukcji", auto._label],
+              <Lista tytul="Auto" wiersze={dk ? [...specyfikacjaAuta(auto), ["Wersja", dk.dania.wersja || "—"], ["Kolor", dk.dania.kolor ?? "—"], ["VIN", dk.dania.vin ?? "—"]]
+                : [...specyfikacjaAuta(auto), ...dodatki(s), ["Lokalizacja", lokalizacja(s)]]} />
+              {dk ? <Lista tytul="Dostawca" wiersze={[["Dostawca", "Auto Midt (Dania)"],
+                ["Typ ceny", dk.dania.typCeny ? `${dk.dania.typCeny}, ${OPIS_TYPU[dk.dania.typCeny] ?? ""}`.replace(/, $/, "") : "—"],
+                ...(dk.a_prev_eur != null && dk.a_prev_eur !== dk.a_eur ? [["Poprzednia cena", pieniadze(waluta === "eur" ? dk.a_prev_eur : dk.a_prev_eur * kurs, waluta)] as [string, string]] : []),
+                ["Próg różnicy", pieniadze(auto.t === null ? null : waluta === "eur" ? auto.t : auto.t * kurs, waluta)],
+                ["Ofert Otomoto", offersLabel(auto)], ...(dk.dania.powod ? [["Bez porównania", dk.dania.powod] as [string, string]] : [])]} />
+              : <Lista tytul="Aukcja" wiersze={[["Typ aukcji", auto._label],
                 ...(auto.end_ms != null ? [["Koniec aukcji", endLabel(auto)] as [string, string]] : []),
                 ...(auto._dealer ? [["Licytuj do", pieniadze(kwota(auto, "bid", waluta), waluta)] as [string, string]] : []),
                 ["Próg różnicy", pieniadze(auto.t === null ? null : waluta === "eur" ? auto.t : auto.t * kurs, waluta)],
-                ["Ofert Otomoto", offersLabel(auto)]]} />
+                ["Ofert Otomoto", offersLabel(auto)]]} />}
             </div>
-            <KosztCalkowity key={`koszt-${auto.id}`} auto={auto} s={s} waluta={waluta} kurs={kurs} />
+            {dk && <PostDania key={`post-${auto.id}`} auto={dk} />}
+            {!dk && <KosztCalkowity key={`koszt-${auto.id}`} auto={auto} s={s} waluta={waluta} kurs={kurs} />}
             {sprzet.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {sprzet.map(([nazwa, rzadkie]) => <Badge key={nazwa} variant={rzadkie ? "secondary" : "outline"}>{nazwa}</Badge>)}
               </div>
             )}
             {s?.prices?.length ? <HistoriaCeny ceny={s.prices} waluta={waluta} kurs={kurs} /> : null}
-            {szczegoly && (
+            {szczegoly && !dk && (
               <Tabs key={`teksty-${auto.id}`} defaultValue="whatsapp">
                 <TabsList>
                   <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>

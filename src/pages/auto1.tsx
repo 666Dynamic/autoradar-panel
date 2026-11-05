@@ -40,6 +40,7 @@ const ROZNICE: Record<Waluta, number[]> = {
 const PRZEBIEGI = Array.from({ length: 12 }, (_, i) => (i + 1) * 25000)
 // Sortowanie w telefonie, gdzie nie ma nagłówków tabeli.
 const SORTY: [string, string][] = [["d:-1", "Największa różnica"], ["km:1", "Najmniejszy przebieg"], ["a:1", "Najniższa cena Auto1"], ["reg:-1", "Najnowszy rocznik"], ["hp:-1", "Największa moc"]]
+const SORTY_DANIA = SORTY.map(([k, n]): [string, string] => [k, n.replace("Auto1", "dostawcy")])
 const OFERTY: [string, string][] = [["1", "co najmniej 1"], ["2", "co najmniej 2"], ["3", "co najmniej 3"], ["4", "co najmniej 4"], ["5", "5"]]
 const TYPY: [string, string][] = [["bez", "Bez dostawczych"], ["tylko", "Tylko dostawcze"]]
 const NAZWY_KOLUMN: Record<string, string> = { reg: "Rocznik", liters: "Poj.", km: "Przebieg", hp: "Moc", fuel: "Paliwo", gear: "Skrzynia", a: "Auto1", o: "Otomoto", d: "Różnica", bid: "Licytuj do", end: "Koniec", offers: "Ofert", link: "Link" }
@@ -53,6 +54,11 @@ function Opis({ tekst, children }: { tekst?: string; children: React.ReactElemen
   return <Tooltip><TooltipTrigger asChild>{children}</TooltipTrigger><TooltipContent>{tekst}</TooltipContent></Tooltip>
 }
 
+// Dania (dania.json): ta sama tabela, cena „a” to cena dostawcy Auto Midt.
+const CzyDania = React.createContext(false)
+const nazwaKolumny = (id: string, dania: boolean) => (dania && id === "a" ? "Dostawca" : NAZWY_KOLUMN[id])
+const OPIS_DOSTAWCY = "Cena dostawcy z listy Auto Midt: margin z duńskim VAT (system marży), netto bez VAT. Przekreślona: poprzednia cena"
+
 const OPISY: Record<string, string> = {
   a: "Cena z nocy, na aukcji mogła już wzrosnąć. Strzałka: zmiana od poprzedniej nocy",
   d: "Na zielono: auto spełnia próg",
@@ -63,6 +69,17 @@ const OPISY: Record<string, string> = {
 // Cena Auto1 i jej zmiana od poprzedniej nocy: taniej na zielono.
 function CenaAuto1({ r, waluta, kurs }: { r: Wiersz; waluta: Waluta; kurs: number }) {
   const zmiana = zmianaCeny(r)
+  if (r.dania) {
+    // Dania: mała etykieta margin/netto i przekreślona poprzednia cena dostawcy.
+    const przed = r.a_prev_eur == null || zmiana === 0 ? null : waluta === "eur" ? r.a_prev_eur : r.a_prev_eur * kurs
+    return (
+      <>
+        {pieniadze(kwota(r, "a", waluta), waluta)}
+        {r.dania.typCeny && <span className="block text-xs text-muted-foreground">{r.dania.typCeny}</span>}
+        {przed !== null && <span className="block text-xs text-muted-foreground line-through">{pieniadze(przed, waluta)}</span>}
+      </>
+    )
+  }
   return (
     <>
       {pieniadze(kwota(r, "a", waluta), waluta)}
@@ -97,7 +114,7 @@ function Niezdatne() {
 }
 
 function Roznica({ r, waluta, kurs }: { r: Wiersz; waluta: Waluta; kurs: number }) {
-  if (r.d_eur === null) return <span className="text-xs text-muted-foreground">{noteLabel(r.note)}</span>
+  if (r.d_eur === null) return <span className="text-xs text-muted-foreground">{r.dania?.powod ?? noteLabel(r.note)}</span>
   const prog = waluta === "pln" && r.t !== null ? r.t * kurs : r.t
   const kwotaRoznicy = pieniadze(kwota(r, "d", waluta), waluta)
   return (
@@ -132,9 +149,10 @@ const Sortowanie = React.createContext<{ sort: Sort; sortuj: (key: string) => vo
 
 function Naglowek({ klucz, children }: { klucz: string; children: React.ReactNode }) {
   const { sort, sortuj } = React.useContext(Sortowanie)
+  const dania = React.useContext(CzyDania)
   const aktywny = sort.key === klucz || (sort.key === "rank" && klucz === "d")
   return (
-    <Opis tekst={OPISY[klucz]}>
+    <Opis tekst={dania && klucz === "a" ? OPIS_DOSTAWCY : OPISY[klucz]}>
       <Button variant="ghost" size="sm" className={cn("px-2", klucz === "name" && "-ml-2")} onClick={() => sortuj(klucz)}>
         {children}
         {aktywny && (sort.dir === 1 ? <ArrowUpIcon /> : <ArrowDownIcon />)}
@@ -169,10 +187,11 @@ function PasekPaczki({ wybrane, wyczysc }: { wybrane: Wiersz[]; wyczysc: () => v
   )
 }
 
-export function Auto1({ dane }: { dane: Dane }) {
+// Strona Auto1, a z `dania` strona Dania: te same kolumny, filtry, sortowanie i okno auta.
+export function Auto1({ dane, dania = false }: { dane: Dane; dania?: boolean }) {
   const auta =React.useMemo(() => przygotuj(dane.rows), [dane])
   const wTelefonie = useIsMobile()
-  const [widok, ustawWidok] = React.useState("24h")
+  const [widok, ustawWidok] = React.useState(dania ? "all" : "24h") // Dania nie ma aukcji
   const [waluta, ustawWalute] = React.useState<Waluta>("eur")
   const [sort, ustawSort] = React.useState<Sort>({ key: "rank", dir: -1 })
   const [f, ustawF] = React.useState(POCZATEK)
@@ -190,11 +209,12 @@ export function Auto1({ dane }: { dane: Dane }) {
   const wWidoku = React.useCallback((r: Wiersz) => widok === "all" || dealerski === r._dealer, [widok, dealerski])
   // Nowe: pierwszy raz w ostatniej nocy. Pierwsza noc historii nie ma z czym porównać, więc tam nic nie jest nowe.
   const nowe = React.useMemo(() => {
+    if (dania) return (r: Wiersz) => !!r.dania?.nowe // dodane u dostawcy od poprzedniego ranka
     const pierwsza = auta.reduce<string | undefined>((m, r) => (r.since && (!m || r.since < m) ? r.since : m), undefined)
     const ostatnia = dane.nights.find((n) => n.status === "done")?.day // noc bez nowych aut nie zostawia znaczka na wczorajszych
     return (r: Wiersz) => !!ostatnia && ostatnia !== pierwsza && r.since === ostatnia
-  }, [auta, dane])
-  const zHistoria = React.useMemo(() => auta.some((r) => r.a_prev_eur != null), [auta])
+  }, [auta, dane, dania])
+  const zHistoria = React.useMemo(() => dania || auta.some((r) => r.a_prev_eur != null), [auta, dania])
   const odroczonyTekst = React.useDeferredValue(tekst) // przy 300 wierszach pisanie nie czeka na tabelę
   const s = React.useMemo(() => szukane(odroczonyTekst), [odroczonyTekst])
 
@@ -258,7 +278,7 @@ export function Auto1({ dane }: { dane: Dane }) {
   }
 
   const kolumny = React.useMemo((): ColumnDef<Wiersz>[] => {
-    const zwykla = (id: string, wartosc: (r: Wiersz) => React.ReactNode): ColumnDef<Wiersz> => ({ id, header: () => <Naglowek klucz={id}>{NAZWY_KOLUMN[id]}</Naglowek>, cell: ({ row }) => wartosc(row.original) })
+    const zwykla = (id: string, wartosc: (r: Wiersz) => React.ReactNode): ColumnDef<Wiersz> => ({ id, header: () => <Naglowek klucz={id}>{nazwaKolumny(id, dania)}</Naglowek>, cell: ({ row }) => wartosc(row.original) })
     return [
       { id: "wybor", enableHiding: false,
         header: ({ table }) => <Checkbox aria-label="Zaznacz stronę" checked={table.getIsAllPageRowsSelected() || (table.getIsSomePageRowsSelected() && "indeterminate")} onCheckedChange={(v) => table.toggleAllPageRowsSelected(v === true)} />,
@@ -267,7 +287,7 @@ export function Auto1({ dane }: { dane: Dane }) {
         cell: ({ row: { original: r } }) => (
           <div className="min-w-60 whitespace-normal">
             <div className="flex items-start">{/* długie nazwy dealerskie: najwyżej dwie linie, pełna po najechaniu */}<Nazwa r={r} otworz={ustawOtwarte} />{r.unroadworthy && <Niezdatne />}</div>
-            <div className="text-xs text-muted-foreground">{r.id} · {r._label}{nowe(r) && <Badge variant="secondary" className="ml-1.5">nowe</Badge>}</div>
+            <div className="text-xs text-muted-foreground">{r.dania ? r.id : `${r.id} · ${r._label}`}{nowe(r) && <Badge variant="secondary" className="ml-1.5">nowe</Badge>}</div>
           </div>
         ) },
       zwykla("reg", regLabel), zwykla("liters", litersLabel), zwykla("km", kmLabel), zwykla("hp", hpLabel), zwykla("fuel", (r) => r._fuel), zwykla("gear", (r) => r._gear),
@@ -278,30 +298,32 @@ export function Auto1({ dane }: { dane: Dane }) {
       zwykla("offers", offersLabel),
       { id: "link", header: () => <Opis tekst={OPISY.link}><span className="px-2">Link</span></Opis>, cell: ({ row: { original: r } }) => <Linki r={r} widziany={widziany} /> },
     ]
-  }, [waluta, dane, nowe])
+  }, [waluta, dane, nowe, dania])
 
   const tabela = useReactTable({
     data: lista, columns: kolumny, getRowId: (r) => r.id, getCoreRowModel: getCoreRowModel(), getPaginationRowModel: getPaginationRowModel(),
-    state: { pagination: strona, rowSelection: zaznaczone, columnVisibility: { ...ukryte, ...(dealerski ? {} : { bid: false, end: false }) } },
+    state: { pagination: strona, rowSelection: zaznaczone, columnVisibility: { ...ukryte, ...(dealerski ? {} : { bid: false, end: false }), ...(dania ? { wybor: false } : {}) } },
     onPaginationChange: ustawStrone, onRowSelectionChange: zmienZaznaczenie, onColumnVisibilityChange: ustawUkryte, autoResetPageIndex: false,
   })
   const wiersze = tabela.getRowModel().rows
 
   return (
     <>
-      <Tabs value={widok} onValueChange={zmienWidok}>
-        <TabsList>
-          {VIEWS.map(([id, nazwa]) => <TabsTrigger key={id} value={id}>{nazwa}</TabsTrigger>)}
-        </TabsList>
-      </Tabs>
+      {!dania && (
+        <Tabs value={widok} onValueChange={zmienWidok}>
+          <TabsList>
+            {VIEWS.map(([id, nazwa]) => <TabsTrigger key={id} value={id}>{nazwa}</TabsTrigger>)}
+          </TabsList>
+        </Tabs>
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
         <Input className="h-9 w-full sm:h-7 sm:w-64" type="search" placeholder="Numer, marka, model" aria-label="Szukaj" value={tekst} onChange={(e) => { ustawTekst(e.target.value); pierwsza() }} />
-        <FiltrLista tytul="Typ aukcji" opcje={typy} wybrane={f.auction} zmien={(v) => pole("auction", v)} />
+        {!dania && <FiltrLista tytul="Typ aukcji" opcje={typy} wybrane={f.auction} zmien={(v) => pole("auction", v)} />}
         <FiltrLista tytul="Paliwo" opcje={opcje("_fuel")} wybrane={f.fuel} zmien={(v) => pole("fuel", v)} />
         <FiltrLista tytul="Skrzynia" opcje={opcje("_gear")} wybrane={f.gear} zmien={(v) => pole("gear", v)} />
         <FiltrLista tytul="Typ auta" opcje={TYPY} wybrane={f.dostawcze} zmien={(v) => pole("dostawcze", v)} jeden />
-        <FiltrZakres tytul={`Cena Auto1 (${waluta === "eur" ? "€" : "zł"})`} opcje={kroki(CENY[waluta], (n) => pieniadze(n, waluta))} od={f.pMin} do={f.pMax} zmienOd={(v) => pole("pMin", v)} zmienDo={(v) => pole("pMax", v)} />
+        <FiltrZakres tytul={`Cena ${dania ? "dostawcy" : "Auto1"} (${waluta === "eur" ? "€" : "zł"})`} opcje={kroki(CENY[waluta], (n) => pieniadze(n, waluta))} od={f.pMin} do={f.pMax} zmienOd={(v) => pole("pMin", v)} zmienDo={(v) => pole("pMax", v)} />
         <FiltrLista tytul={`Różnica (${waluta === "eur" ? "€" : "zł"})`} opcje={kroki(ROZNICE[waluta], (n) => "co najmniej " + pieniadze(n, waluta))} wybrane={f.dMin ? [f.dMin] : []} zmien={(v) => pole("dMin", v[0] ?? "")} jeden />
         <FiltrZakres tytul="Rocznik" opcje={lata} od={f.yMin} do={f.yMax} zmienOd={(v) => pole("yMin", v)} zmienDo={(v) => pole("yMax", v)} />
         <FiltrZakres tytul="Przebieg" opcje={kroki(PRZEBIEGI, (n) => `${n / 1000} tys. km`)} od={f.kmMin} do={f.kmMax} zmienOd={(v) => pole("kmMin", v)} zmienDo={(v) => pole("kmMax", v)} />
@@ -311,12 +333,12 @@ export function Auto1({ dane }: { dane: Dane }) {
           <TooltipTrigger asChild><Toggle variant="outline" size="sm" pressed={f.small} onPressedChange={(v) => pole("small", v)}>Do 2 l</Toggle></TooltipTrigger>
           <TooltipContent>Auta bez podanej pojemności zostają na liście</TooltipContent>
         </Tooltip>
-        <Toggle variant="outline" size="sm" pressed={f.noBroken} onPressedChange={(v) => pole("noBroken", v)}>Bez niezdatnych</Toggle>
+        {!dania && <Toggle variant="outline" size="sm" pressed={f.noBroken} onPressedChange={(v) => pole("noBroken", v)}>Bez niezdatnych</Toggle>}
         {zHistoria && <Toggle variant="outline" size="sm" pressed={f.nowe} onPressedChange={(v) => pole("nowe", v)}>Nowe ({ileNowych})</Toggle>}
         {zHistoria && (
           <Tooltip>
             <TooltipTrigger asChild><Toggle variant="outline" size="sm" pressed={f.zmiany} onPressedChange={(v) => pole("zmiany", v)}>Zmiana ceny ({ileZmian})</Toggle></TooltipTrigger>
-            <TooltipContent>Cena Auto1 inna niż poprzedniej nocy, strzałka przy cenie</TooltipContent>
+            <TooltipContent>{dania ? "Cena dostawcy zmieniona, poprzednia przekreślona przy cenie" : "Cena Auto1 inna niż poprzedniej nocy, strzałka przy cenie"}</TooltipContent>
           </Tooltip>
         )}
         {aktywneFiltry && <Button variant="ghost" size="sm" onClick={() => { ustawF(POCZATEK); ustawTekst(""); pierwsza() }}>Wyczyść filtry<XIcon /></Button>}
@@ -327,7 +349,7 @@ export function Auto1({ dane }: { dane: Dane }) {
         {wDrugim && <Button size="sm" variant="outline" onClick={() => { ustawF(POCZATEK); zmienWidok(drugiWidok) }}>To auto jest w widoku: {VIEWS.find((v) => v[0] === drugiWidok)?.[1]}</Button>}
         <div className="ml-auto flex items-center gap-2">
           {wTelefonie && (
-            <Wybor size="sm" className="w-48" puste="Najlepsze najpierw" opcje={SORTY} value={sort.key === "rank" ? "" : `${sort.key}:${sort.dir}`}
+            <Wybor size="sm" className="w-48" puste="Najlepsze najpierw" opcje={dania ? SORTY_DANIA : SORTY} value={sort.key === "rank" ? "" : `${sort.key}:${sort.dir}`}
               onChange={(v) => { const [key, dir] = v ? v.split(":") : ["rank", "-1"]; ustawSort({ key, dir: Number(dir) as 1 | -1 }); pierwsza() }} />
           )}
           <ToggleGroup type="single" variant="outline" size="sm" value={waluta} onValueChange={zmienWalute}>
@@ -341,7 +363,7 @@ export function Auto1({ dane }: { dane: Dane }) {
                 <DropdownMenuLabel>Pokaż kolumny</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 {tabela.getAllColumns().filter((k) => k.getCanHide() && (dealerski || !["bid", "end"].includes(k.id))).map((k) => (
-                  <DropdownMenuCheckboxItem key={k.id} checked={k.getIsVisible()} onCheckedChange={(v) => k.toggleVisibility(v)}>{NAZWY_KOLUMN[k.id]}</DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem key={k.id} checked={k.getIsVisible()} onCheckedChange={(v) => k.toggleVisibility(v)}>{nazwaKolumny(k.id, dania)}</DropdownMenuCheckboxItem>
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
@@ -355,12 +377,12 @@ export function Auto1({ dane }: { dane: Dane }) {
             <Card key={r.id} className={cn(widziane.has(r.id) && "opacity-60", zaznaczone[r.id] && "ring-2 ring-primary")}>
               <CardContent className="flex flex-col gap-2">
                 <div className="flex items-start gap-2">
-                  <Checkbox className="mt-1" aria-label={`Zaznacz ${r.id}`} checked={!!zaznaczone[r.id]} onCheckedChange={(v) => tabela.getRow(r.id).toggleSelected(v === true)} />
+                  {!dania && <Checkbox className="mt-1" aria-label={`Zaznacz ${r.id}`} checked={!!zaznaczone[r.id]} onCheckedChange={(v) => tabela.getRow(r.id).toggleSelected(v === true)} />}
                   <div><button className="text-left font-medium" onClick={() => ustawOtwarte(r)}>{r.title || r.id}</button>{r.unroadworthy && <Niezdatne />}{nowe(r) && <Badge variant="secondary" className="ml-1.5">nowe</Badge>}</div>
                 </div>
-                <p className="text-xs text-muted-foreground">{r.id} · {r._label}<br />{[regLabel(r), kmLabel(r), litersLabel(r), hpLabel(r), r._fuel, r._gear].filter((x) => x !== "—").join(" · ")}</p>
+                <p className="text-xs text-muted-foreground">{r.dania ? r.id : `${r.id} · ${r._label}`}<br />{[regLabel(r), kmLabel(r), litersLabel(r), hpLabel(r), r._fuel, r._gear].filter((x) => x !== "—").join(" · ")}</p>
                 <div className="grid grid-cols-3 gap-y-2 text-sm">
-                  <span><span className="block text-xs text-muted-foreground">Auto1</span><CenaAuto1 r={r} waluta={waluta} kurs={dane.meta.rate_value} /></span>
+                  <span><span className="block text-xs text-muted-foreground">{nazwaKolumny("a", dania)}</span><CenaAuto1 r={r} waluta={waluta} kurs={dane.meta.rate_value} /></span>
                   <span><span className="block text-xs text-muted-foreground">Otomoto</span>{pieniadze(kwota(r, "o", waluta), waluta)}</span>
                   <span><span className="block text-xs text-muted-foreground">Ofert</span>{offersLabel(r)}</span>
                   {dealerski && <span><span className="block text-xs text-muted-foreground">Licytuj do</span>{pieniadze(kwota(r, "bid", waluta), waluta)}</span>}
@@ -379,6 +401,7 @@ export function Auto1({ dane }: { dane: Dane }) {
         </div>
       ) : (
         <div ref={poczatekListy} className="scroll-mt-16 rounded-lg border [&>[data-slot=table-container]]:max-h-[calc(100svh-5rem)] [&>[data-slot=table-container]]:overflow-auto">
+          <CzyDania.Provider value={dania}>
           <Sortowanie.Provider value={sortowanie}>
             <OknoOtwarte.Provider value={otwarte !== null}>
             <Table>
@@ -400,6 +423,7 @@ export function Auto1({ dane }: { dane: Dane }) {
             </Table>
             </OknoOtwarte.Provider>
           </Sortowanie.Provider>
+          </CzyDania.Provider>
         </div>
       )}
       {wTelefonie && lista.length === 0 && <p className="text-muted-foreground">Brak aut dla tych filtrów.</p>}
@@ -412,7 +436,7 @@ export function Auto1({ dane }: { dane: Dane }) {
         <Button variant="outline" size="icon-sm" aria-label="Następna strona" disabled={!tabela.getCanNextPage()} onClick={() => zmienStrone(1)}><ChevronRightIcon /></Button>
       </div>
 
-      {wybrane.length > 0 && <PasekPaczki wybrane={wybrane} wyczysc={() => zmienZaznaczenie({})} />}
+      {!dania && wybrane.length > 0 && <PasekPaczki wybrane={wybrane} wyczysc={() => zmienZaznaczenie({})} />}
       <OknoAuta auto={otwarte} waluta={waluta} kurs={dane.meta.rate_value} zamknij={() => ustawOtwarte(null)} widziany={widziany} />
     </>
   )

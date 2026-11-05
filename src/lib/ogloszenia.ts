@@ -8,16 +8,16 @@ export const KRAJE_OGLOSZEN: [string, string, string, string][] = [
   ["PL", "Polska", "🇵🇱", ""],
 ]
 
-export const POLA_OGLOSZENIA = { kraj: "DE", auto: "", wersja: "", vin: "", paliwo: "", skrzynia: "", rejestracja: "", przebieg: "", moc: "", cena: "", waluta: "eur", atuty: "", kontakt: "", kolor: "", typCeny: "" }
+export const POLA_OGLOSZENIA = { kraj: "DE", auto: "", wersja: "", vin: "", paliwo: "", skrzynia: "", rejestracja: "", przebieg: "", moc: "", cena: "", waluta: "eur", atuty: "", kolor: "", typCeny: "" }
 export type Ogloszenie = typeof POLA_OGLOSZENIA
 
+// Wzory właściciela. „OFERTA SPROWADZENIA” to osobny rodzaj posta (cena w zł po opłatach), nie styl tamtego.
 export const WZORY: [string, string, string][] = [
-  ["krotki", "Krótki", "Dane linijka pod linijką, jak dziś na WhatsAppie"],
-  ["lista", "Z ikonami", "WhatsApp: pogrubiona nazwa i cena, ikony przy danych"],
-  ["pelny", "Pełny", "Facebook lub grupa: nagłówek, opis importu, atuty i kontakt"],
-  ["zamowienie", "Na zamówienie", "Styl strony firmowej: „Możliwość sprowadzenia na zamówienie”, punkty i cena"],
-  ["oferta", "Oferta", "Styl „OFERTA SPROWADZENIA”: dane w jednej linii, wyposażenie, krótko"],
+  ["whatsapp", "WhatsApp", "Jak jego wiadomości: flaga i auto, VIN, wersja, paliwo, rejestracja, przebieg, moc, cena"],
+  ["zamowienie", "Facebook – Możliwość sprowadzenia", "Jak jego post o Audi A6 z Danii: auto u kontrahenta, punkty, cena, import od A do Z"],
+  ["oferta", "OFERTA SPROWADZENIA", "Osobny rodzaj posta, jak jego post o Jaguarze E-Pace: dane w jednej linii, cena po opłatach"],
 ]
+export const wzorZPamieci = (w: string | undefined) => (WZORY.some(([id]) => id === w) ? w! : "whatsapp")
 
 const kraj = (o: Ogloszenie) => KRAJE_OGLOSZEN.find(([k]) => k === o.kraj)
 const liczba = (s: string) => (s.trim() === "" ? "" : fmt(Number(s.replace(/\D/g, ""))))
@@ -112,7 +112,7 @@ function wzorWlasciciela(o: Ogloszenie, wzor: string, skad: string) {
     return linie(
       "OFERTA SPROWADZENIA" + (skad ? ` ${skad.toUpperCase()}` : ""), nazwa, dane, o.kolor, ODSTEP, kwota && `Cena: ${kwota}`,
       ...(atuty(o).length ? [ODSTEP, `Wyposażenie: ${atuty(o).join(", ")}`] : []),
-      ODSTEP, "Zainteresowany? Napisz wiadomość." + (o.kontakt ? ` Tel. ${o.kontakt}` : ""),
+      ODSTEP, "Zainteresowany? Napisz wiadomość.",
     )
   }
   const silnik = [[pojemnosc(o), o.paliwo.toLowerCase()].filter(Boolean).join(" "), moc(o), o.skrzynia.toLowerCase()].filter(Boolean).join(", ")
@@ -125,37 +125,15 @@ function wzorWlasciciela(o: Ogloszenie, wzor: string, skad: string) {
     ...(atuty(o).length ? [ODSTEP, "Najważniejsze informacje o tym egzemplarzu:", ...atuty(o).map((a) => `• ${a}`)] : []),
     ODSTEP, kwota && `Cena za auto: ${kwota}`, ODSTEP,
     skad && "Zajmujemy się całością procesu importu: weryfikacją, transportem i formalnościami.", ODSTEP,
-    "Jeśli jesteś zainteresowany sprowadzeniem tego konkretnego egzemplarza lub szukasz podobnego modelu, napisz do nas wiadomość" + (o.kontakt ? ` lub zadzwoń: ${o.kontakt}` : "."),
+    "Jeśli jesteś zainteresowany sprowadzeniem tego konkretnego egzemplarza lub szukasz podobnego modelu, napisz do nas wiadomość.",
   )
 }
 
 // Puste pola znikają z tekstu, więc ogłoszenie da się zrobić z samą nazwą i ceną.
 export function ogloszenie(o: Ogloszenie, wzor: string) {
   const [, , flaga, skad] = kraj(o) ?? ["", "", "", ""]
-  const silnik = [o.paliwo, moc(o), o.skrzynia].filter(Boolean).join(" · ")
   if (wzor === "zamowienie" || wzor === "oferta") return wzorWlasciciela(o, wzor, skad)
-  if (wzor === "krotki") {
-    return linie(`${flaga} ${o.auto}`.trim(), o.vin, o.wersja, o.paliwo, o.skrzynia, o.rejestracja, przebieg(o), moc(o), cena(o), ...atuty(o).map((a) => `✅ ${a}`), o.kontakt)
-  }
-  if (wzor === "lista") {
-    return linie(
-      `${flaga} *${o.auto || "Auto"}*`, o.wersja, ODSTEP,
-      o.rejestracja && `📅 ${o.rejestracja}`, przebieg(o) && `🛣️ ${przebieg(o)}`, silnik && `⚙️ ${silnik}`, o.vin && `🔑 VIN: ${o.vin}`,
-      ...(atuty(o).length ? [ODSTEP, ...atuty(o).map((a) => `✅ ${a}`)] : []),
-      ODSTEP, cena(o) && `💶 *${cena(o)}*`, o.kontakt && `📞 ${o.kontakt}`,
-    )
-  }
-  const naglowek = skad ? `${flaga} Na zamówienie ${skad}: ${o.auto}` : `${flaga} ${o.auto}`
-  return linie(
-    naglowek.trim(), ODSTEP,
-    skad && `Nasz sprawdzony partner ${skad} ma na sprzedaż ten egzemplarz. Sprowadzimy go dla Ciebie od A do Z.`, ODSTEP,
-    o.wersja && `🚗 Wersja: ${o.wersja}`, o.rejestracja && `📅 Pierwsza rejestracja: ${o.rejestracja}`, przebieg(o) && `🛣️ Przebieg: ${przebieg(o)}`,
-    silnik && `⛽ Silnik: ${silnik}`, o.vin && `🔑 VIN: ${o.vin}`,
-    ...(atuty(o).length ? [ODSTEP, "Najważniejsze o tym aucie:", ...atuty(o).map((a) => `✅ ${a}`)] : []),
-    ODSTEP, cena(o) && `💶 Cena: ${cena(o)}`,
-    skad && "Zajmujemy się całym importem: sprawdzeniem auta, transportem i formalnościami.",
-    ODSTEP, `📩 Zainteresowany tym autem albo szukasz podobnego? Napisz wiadomość${o.kontakt ? ` lub zadzwoń: ${o.kontakt}` : "."}`,
-  )
+  return linie(`${flaga} ${o.auto}`.trim(), o.vin, o.wersja, o.paliwo, o.rejestracja, przebieg(o), moc(o), cena(o), ...atuty(o).map((a) => `✅ ${a}`))
 }
 
 // „Zrób ogłoszenie” w oknie auta Auto1: numer auta czeka w pamięci karty, podstrona Ogłoszenia go zabiera.

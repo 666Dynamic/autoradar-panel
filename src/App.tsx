@@ -58,8 +58,8 @@ export function App() {
           {strona === "moje-auta" && <MojeAuta dane={dane} />}
           {/* Ogłoszenia też bez nocnych danych; z danymi można wczytać auto po numerze. */}
           {strona === "ogloszenia" && <Ogloszenia dane={dane} />}
-          {/* Dania: wklejona lista z maila Auto Midt, bez nocnych danych Auto1; zostaje w pamięci jak Auto1. */}
-          {odwiedzone.has("dania") && <div className={strona === "dania" ? "contents" : "hidden"}><Dania /></div>}
+          {/* Dania: lista Auto Midt z porannego kroku (dania.json) w tabeli Auto1; zostaje w pamięci jak Auto1. */}
+          {odwiedzone.has("dania") && <div className={strona === "dania" ? "flex min-w-0 flex-1 flex-col gap-4" : "hidden"}><Dania /></div>}
         </main>
       </SidebarInset>
     </SidebarProvider>

@@ -11,7 +11,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Wybor } from "@/components/wybor"
 import { FUEL, GEAR, wyposazenie } from "@/lib/auta"
 import { wczytajSzczegoly, type Dane } from "@/lib/dane"
-import { KRAJE_OGLOSZEN, POLA_OGLOSZENIA, WZORY, ogloszenie, rozpoznajTekst, autoDoOgloszenia, type Ogloszenie } from "@/lib/ogloszenia"
+import { KRAJE_OGLOSZEN, POLA_OGLOSZENIA, WZORY, ogloszenie, rozpoznajTekst, autoDoOgloszenia, wzorZPamieci, type Ogloszenie } from "@/lib/ogloszenia"
 
 const PALIWA: [string, string][] = ["Diesel", "Benzyna", "Hybryda", "Hybryda plug-in", "Elektryczny", "Benzyna + LPG"].map((x) => [x, x])
 const SKRZYNIE: [string, string][] = [["Automat", "Automat"], ["Manualna", "Manualna"]]
@@ -19,13 +19,14 @@ const KLUCZ = "ar_ogloszenie"
 
 const wielka = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
-// Szkic ogłoszenia i wybrany wzór zostają w tej przeglądarce; kontakt przechodzi do następnego ogłoszenia.
+// Szkic ogłoszenia i wybrany wzór zostają w tej przeglądarce.
 function odczytajSzkic(): { pola: Ogloszenie; wzor: string } {
   try {
     const s = JSON.parse(localStorage.getItem(KLUCZ) ?? "{}")
-    return { pola: { ...POLA_OGLOSZENIA, ...s.pola }, wzor: s.wzor ?? "krotki" }
+    const pola = Object.fromEntries(Object.entries(POLA_OGLOSZENIA).map(([k, v]) => [k, typeof s.pola?.[k] === "string" ? s.pola[k] : v])) as Ogloszenie
+    return { pola, wzor: wzorZPamieci(s.wzor) } // stare wzory (Krótki, Z ikonami, Pełny) → WhatsApp
   } catch {
-    return { pola: POLA_OGLOSZENIA, wzor: "krotki" }
+    return { pola: POLA_OGLOSZENIA, wzor: "whatsapp" }
   }
 }
 
@@ -63,7 +64,7 @@ export function Ogloszenia({ dane }: { dane: Dane | null }) {
     const nazwa = [r.make, r.model].filter(Boolean).join(" ")
     const kraj = s?.country ?? s?.countryCode
     ustawO((x) => ({
-      ...POLA_OGLOSZENIA, kontakt: x.kontakt, waluta: x.waluta,
+      ...POLA_OGLOSZENIA, waluta: x.waluta,
       kraj: kraj && KRAJE_OGLOSZEN.some(([k]) => k === kraj) ? kraj : x.kraj,
       auto: nazwa || r.title,
       wersja: nazwa && r.title.startsWith(nazwa) ? r.title.slice(nazwa.length).trim() : r.title,
@@ -88,7 +89,7 @@ export function Ogloszenia({ dane }: { dane: Dane | null }) {
     const w = rozpoznajTekst(wklejony)
     const ile = Object.keys(w).filter((k) => k !== "waluta").length
     if (!ile) return toast.error("Nie rozpoznałem żadnych danych. Wpisz je ręcznie.")
-    ustawO((x) => ({ ...POLA_OGLOSZENIA, kontakt: x.kontakt, waluta: x.waluta, kraj: x.kraj, ...w }))
+    ustawO((x) => ({ ...POLA_OGLOSZENIA, waluta: x.waluta, kraj: x.kraj, ...w }))
     ustawWklejony("")
     toast.success("Uzupełniono dane z tekstu. Sprawdź je i dopisz brakujące.")
   }
@@ -134,12 +135,11 @@ export function Ogloszenia({ dane }: { dane: Dane | null }) {
               </div>
             </Pole>
             <Pole etykieta="Kolor"><Input placeholder="szary" {...pole("kolor")} /></Pole>
-            <Pole etykieta="Kontakt"><Input placeholder="telefon" {...pole("kontakt")} /></Pole>
             <Pole etykieta="Atuty, każdy w nowej linii" className="flex flex-col gap-1.5 sm:col-span-2">
               <Textarea rows={4} placeholder={"Bezwypadkowe, oryginalny lakier\nSerwis w ASO\nOpony letnie w cenie"} {...pole("atuty")} />
             </Pole>
           </div>
-          <Button variant="ghost" size="sm" className="self-start" onClick={() => ustawO((x) => ({ ...POLA_OGLOSZENIA, kontakt: x.kontakt, waluta: x.waluta }))}><RotateCcwIcon />Nowe ogłoszenie</Button>
+          <Button variant="ghost" size="sm" className="self-start" onClick={() => ustawO((x) => ({ ...POLA_OGLOSZENIA, waluta: x.waluta }))}><RotateCcwIcon />Nowe ogłoszenie</Button>
         </CardContent>
       </Card>
 
@@ -149,11 +149,10 @@ export function Ogloszenia({ dane }: { dane: Dane | null }) {
           <CardDescription>{WZORY.find(([id]) => id === wzor)?.[2]}</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          <ToggleGroup type="single" variant="outline" className="w-full" value={wzor} onValueChange={(v) => v && ustawWzor(v)}>
-            {WZORY.map(([id, nazwa]) => <ToggleGroupItem key={id} value={id} className="flex-1">{nazwa}</ToggleGroupItem>)}
+          <ToggleGroup type="single" variant="outline" orientation="vertical" className="w-full flex-col" value={wzor} onValueChange={(v) => v && ustawWzor(v)}>
+            {WZORY.map(([id, nazwa]) => <ToggleGroupItem key={id} value={id} className="w-full">{nazwa}</ToggleGroupItem>)}
           </ToggleGroup>
           <div className="rounded-lg bg-muted p-4 text-sm leading-relaxed whitespace-pre-wrap break-words">{tekst || <span className="text-muted-foreground">Wpisz dane auta albo wczytaj je z Auto1.</span>}</div>
-          {wzor === "lista" && <p className="text-xs text-muted-foreground">Gwiazdki WhatsApp zamieni na pogrubienie.</p>}
           <Button onClick={kopiuj} disabled={!tekst}>{skopiowano ? <CheckIcon /> : <CopyIcon />}{skopiowano ? "Skopiowano" : "Kopiuj tekst"}</Button>
         </CardContent>
       </Card>

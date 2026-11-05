@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { dodatki, endLabel, kwota, lokalizacja, offersLabel, oplatyAuto1, pieniadze, specyfikacjaAuta, stawkaAkcyzy, tekstFacebook, tekstWhatsApp, wyposazenieOkna, type Waluta, type Wiersz } from "@/lib/auta"
 import { wczytajSzczegoly, type Szczegoly } from "@/lib/dane"
+import { linkMobile } from "@/lib/mobile"
 import { pobierzPaczke, zdjeciaAuta } from "@/lib/paczka"
 import { odczytajOferty, odczytajTransport, zapiszOferte, zapiszTransport } from "@/lib/pamiec"
 import { cn } from "@/lib/utils"
@@ -242,6 +243,7 @@ export function OknoAuta({ auto, waluta, kurs, zamknij, widziany }: { auto: Wier
     if (auto) wczytajSzczegoly().then(ustaw)
   }, [auto])
   const s = auto ? szczegoly?.[auto.id] : undefined
+  const mobile = auto ? linkMobile(auto) : null
   const sprzet = wyposazenieOkna(s)
   return (
     <Dialog open={auto !== null} onOpenChange={(open) => !open && zamknij()}>
@@ -255,6 +257,7 @@ export function OknoAuta({ auto, waluta, kurs, zamknij, widziany }: { auto: Wier
             <div className="flex flex-wrap gap-2">
               {auto.auto1_url && <Button asChild variant="outline" size="sm" className="flex-1"><a href={auto.auto1_url} target="_blank" rel="noopener">Auto1<ExternalLinkIcon /></a></Button>}
               {auto.search_url && <Button asChild variant="outline" size="sm" className="flex-1"><a href={auto.search_url} target="_blank" rel="noopener" onClick={() => widziany(auto.id)}>Otomoto<ExternalLinkIcon /></a></Button>}
+              {mobile && <Button asChild variant="outline" size="sm" className="flex-1"><a href={mobile} target="_blank" rel="noopener">mobile.de<ExternalLinkIcon /></a></Button>}
               {s?.report && <Button asChild variant="outline" size="sm" className="flex-1"><a href={s.report} target="_blank" rel="noopener">Raport<ExternalLinkIcon /></a></Button>}
             </div>
             <Ceny auto={auto} waluta={waluta} />

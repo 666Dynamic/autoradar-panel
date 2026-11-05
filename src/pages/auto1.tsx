@@ -22,6 +22,7 @@ import { useIsMobile } from "@/hooks/use-mobile"
 import { AUCTION_LABELS, endLabel, hpLabel, kmLabel, kwota, litersLabel, noteLabel, offersLabel, pasuje, pieniadze, porownaj, przygotuj, regLabel, szukane, zmianaCeny, type Sort, type Waluta, type Wiersz } from "@/lib/auta"
 import type { Dane } from "@/lib/dane"
 import { pobierzPaczke } from "@/lib/paczka"
+import { linkMobile } from "@/lib/mobile"
 import { odczytaj, zapisz } from "@/lib/pamiec"
 import { cn } from "@/lib/utils"
 
@@ -56,7 +57,7 @@ const OPISY: Record<string, string> = {
   a: "Cena z nocy, na aukcji mogła już wzrosnąć. Strzałka: zmiana od poprzedniej nocy",
   d: "Na zielono: auto spełnia próg",
   offers: "Ile ofert policzono do średniej, z ilu znalezionych",
-  link: "Te same wyszukiwanie w Otomoto, z którego jest średnia",
+  link: "Otomoto: to samo wyszukiwanie, z którego jest średnia. mobile.de: te same zasady, do sprawdzenia ręcznie",
 }
 
 // Cena Auto1 i jej zmiana od poprzedniej nocy: taniej na zielono.
@@ -78,6 +79,17 @@ function CenaAuto1({ r, waluta, kurs }: { r: Wiersz; waluta: Waluta; kurs: numbe
 function Koniec({ r }: { r: Wiersz }) {
   const [kiedy, dopisek] = endLabel(r).split(" (")
   return <>{kiedy}{dopisek && <span className="block text-xs text-muted-foreground">{dopisek.replace(")", "")}</span>}</>
+}
+
+function Linki({ r, widziany }: { r: Wiersz; widziany: (id: string) => void }) {
+  const mobile = linkMobile(r)
+  if (!r.search_url && !mobile) return "—"
+  return (
+    <span className="inline-flex flex-col items-center gap-0.5">
+      {r.search_url && <a className="underline" href={r.search_url} target="_blank" rel="noopener" onClick={() => widziany(r.id)}>Otomoto</a>}
+      {mobile && <a className="text-xs text-muted-foreground underline" href={mobile} target="_blank" rel="noopener">mobile.de</a>}
+    </span>
+  )
 }
 
 function Niezdatne() {
@@ -264,7 +276,7 @@ export function Auto1({ dane }: { dane: Dane }) {
       zwykla("d", (r) => <Roznica r={r} waluta={waluta} kurs={dane.meta.rate_value} />),
       zwykla("bid", (r) => <span className="font-medium">{pieniadze(kwota(r, "bid", waluta), waluta)}</span>), zwykla("end", (r) => <Koniec r={r} />),
       zwykla("offers", offersLabel),
-      { id: "link", header: () => <Opis tekst={OPISY.link}><span className="px-2">Link</span></Opis>, cell: ({ row: { original: r } }) => (r.search_url ? <a className="underline" href={r.search_url} target="_blank" rel="noopener" onClick={() => widziany(r.id)}>Otomoto</a> : "—") },
+      { id: "link", header: () => <Opis tekst={OPISY.link}><span className="px-2">Link</span></Opis>, cell: ({ row: { original: r } }) => <Linki r={r} widziany={widziany} /> },
     ]
   }, [waluta, dane, nowe])
 
@@ -359,7 +371,7 @@ export function Auto1({ dane }: { dane: Dane }) {
                     <Roznica r={r} waluta={waluta} kurs={dane.meta.rate_value} />
                     {r.d_eur !== null && r.t !== null && <span className="text-xs text-muted-foreground">próg {pieniadze(waluta === "pln" ? r.t * dane.meta.rate_value : r.t, waluta)}</span>}
                   </span>
-                  {r.search_url && <a className="text-sm underline" href={r.search_url} target="_blank" rel="noopener" onClick={() => widziany(r.id)}>Otomoto</a>}
+                  <span className="flex gap-3 text-sm"><Linki r={r} widziany={widziany} /></span>
                 </div>
               </CardContent>
             </Card>

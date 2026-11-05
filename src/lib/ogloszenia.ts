@@ -8,7 +8,7 @@ export const KRAJE_OGLOSZEN: [string, string, string, string][] = [
   ["PL", "Polska", "🇵🇱", ""],
 ]
 
-export const POLA_OGLOSZENIA = { kraj: "DE", auto: "", wersja: "", vin: "", paliwo: "", skrzynia: "", rejestracja: "", przebieg: "", moc: "", cena: "", waluta: "eur", atuty: "", kontakt: "", kolor: "" }
+export const POLA_OGLOSZENIA = { kraj: "DE", auto: "", wersja: "", vin: "", paliwo: "", skrzynia: "", rejestracja: "", przebieg: "", moc: "", cena: "", waluta: "eur", atuty: "", kontakt: "", kolor: "", typCeny: "" }
 export type Ogloszenie = typeof POLA_OGLOSZENIA
 
 export const WZORY: [string, string, string][] = [
@@ -92,7 +92,7 @@ export function rozpoznajTekst(tekst: string): Partial<Ogloszenie> {
 }
 
 // Styl właściciela (facebook.com/autosprowadzone): tysiące spacją w cenie i przebiegu, „04.2018” w linii danych.
-const spacja = (s: string) => (s.trim() === "" ? "" : Number(s.replace(/\D/g, "")).toLocaleString("pl-PL").replace(/\s/g, " "))
+const spacja = (s: string) => (s.trim() === "" ? "" : String(Number(s.replace(/\D/g, ""))).replace(/\B(?=(\d{3})+(?!\d))/g, " "))
 const rok = (o: Ogloszenie) => o.rejestracja.match(/(\d{4})$/)?.[1] ?? ""
 const miesiac = (o: Ogloszenie) => o.rejestracja.match(/(\d{2})[./-](\d{4})$/)?.slice(1).join(".") ?? o.rejestracja
 const pojemnosc = (o: Ogloszenie) => o.wersja.match(/\b(\d\.\d)\b/)?.[1] ?? ""
@@ -103,7 +103,9 @@ const W_KRAJU: Record<string, string> = {
 }
 
 function wzorWlasciciela(o: Ogloszenie, wzor: string, skad: string) {
-  const kwota = o.cena.trim() ? `${spacja(o.cena)} ${o.waluta === "eur" ? "€" : "zł"}` : ""
+  // Typ ceny dostawcy z Danii: margin = z VAT (system marży), netto = bez VAT.
+  const typ = o.typCeny === "margin" ? " (brutto, VAT marża)" : o.typCeny === "netto" ? " (netto, bez VAT)" : ""
+  const kwota = o.cena.trim() ? `${spacja(o.cena)} ${o.waluta === "eur" ? "€" : "zł"}${typ}` : ""
   const nazwa = [o.auto, o.wersja].filter(Boolean).join(" ")
   if (wzor === "oferta") {
     const dane = [miesiac(o), o.przebieg.trim() && `${liczba(o.przebieg)} km`, moc(o), o.paliwo.toLowerCase(), o.skrzynia.toLowerCase()].filter(Boolean).join(" · ")

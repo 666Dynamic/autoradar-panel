@@ -43,7 +43,9 @@ export type AutoDK = {
   total: number | null
   compared: number | null
   search_url: string | null
-  nowe: boolean // znacznik „New” na stronie dostawcy
+  nowe: boolean // znacznik „New” na stronie dostawcy / dodane od poprzedniej nocy
+  price_type: string | null // margin = cena z duńskim VAT 25% (system marży), netto = bez VAT
+  a_prev_eur: number | null // poprzednia cena dostawcy (previousPriceEuro)
 }
 
 const NAGLOWEK = ["year", "type", "brand", "model", "variant", "type", "vin", "colour", "km", "price full vat", "pictures", "co2"]
@@ -83,7 +85,7 @@ export function bloki(tekst: string) {
 const puste = (pos: number, id: string, title: string): AutoDK => ({
   id, pos, status: "unparsed", reason: null, title, make: "", model: "", variant: "", vin: null, reg_date: null, reg: null, fuel: null, type: "",
   gear: null, hp: null, km: null, a_eur: null, color: null, body_text: null, co2_g: null, photos_link: null, photos_zip: null,
-  o_eur: null, d_eur: null, t: null, ok: false, total: null, compared: null, search_url: null, nowe: false,
+  o_eur: null, d_eur: null, t: null, ok: false, total: null, compared: null, search_url: null, nowe: false, price_type: null, a_prev_eur: null,
 })
 
 // Pola karty auta na automidt.dk (i kolumny eksportu do Excela po zmapowaniu). Tekst jak na stronie.
@@ -99,6 +101,7 @@ export type Karta = {
   first_reg: string // „18.12.2014” albo „2014-12-18”
   price: string // „€ 2.200” albo „Sold”
   sold?: string | boolean
+  price_type?: string
   new?: string | boolean
   color?: string
   body?: string
@@ -107,7 +110,7 @@ export type Karta = {
 }
 
 // Strona nie ma pola skrzyni: automat, gdy wersja tak mówi, inaczej manualna (decyzja 05.11). Jak gearbox_from w skanerze.
-const AUTOMAT = /\b(aut|auto|automat|automatic|automatik|automatgear|dsg|s[ -]?tronic|powershift|tiptronic|steptronic|multitronic|cvt|edc|eat\d?|e-?cvt|geartronic|7g-tronic|9g-tronic|xtronic|amt)\b/i
+const AUTOMAT = /\b(aut|auto|automat|automatic|automatik|automatgear|dsg|s[ -]?tronic|powershift|tiptronic|steptronic|multitronic|cvt|dct|pdk|dkg|edc|eat\d?|e-?cvt|geartronic|7g-tronic|9g-tronic|xtronic|amt)\b/i
 export const skrzyniaZWersji = (w: string) => (AUTOMAT.test(w) ? "automatic" : "manual")
 const DWUCZLONOWE = ["land rover", "alfa romeo", "aston martin", "mercedes benz", "rolls royce", "lynk co", "ds automobiles"]
 export function rozdzielNazwe(nazwa: string): [string, string] {
@@ -153,6 +156,7 @@ export function rozlicz(wejscie: { karta: Karta | string; etykieta: string }[]):
       ...puste(pos, "DK-" + vin, tytul), make, model, variant: k.variant, vin, reg_date: data, reg: data?.slice(0, 7) ?? null,
       type: k.fuel, color: k.color?.trim() || null, body_text: k.body?.trim() || null, km: kwotaListy(k.km.replace(/\s*km$/i, "")),
       photos_link: link, photos_zip: photosZip(link), co2_g: co2 ? Number(co2[1]) : null, nowe: tak(k.new, /^(new|ny|true|1|yes|ja)$/i),
+      price_type: k.price_type?.trim().toLowerCase() || null,
     }
     if (!data) return wynik.push({ ...a, reason: "nie da się odczytać 1. rejestracji: " + k.first_reg.slice(0, 30) })
     if (a.km === null) return wynik.push({ ...a, reason: "nie da się odczytać przebiegu: " + k.km.slice(0, 30) })
@@ -179,12 +183,12 @@ export const czytajListe = (tekst: string) => rozlicz(bloki(tekst).map((l) => ({
 // Eksport „Export to Excel” ze strony: nazwy kolumn poznamy przy pierwszym pliku. Rozpoznajemy je po kilku nazwach;
 // kolumny bez dopasowania strona pokazuje, żeby dopisać je tutaj.
 const KOLUMNY: [keyof Karta, RegExp][] = [
-  ["vin", /^(vin|stelnr\.?|stelnummer|chassis( ?nr\.?)?)$/i], ["name", /^(car|bil|name|navn|make ?(&|and|\+)? ?model|mærke ?(og|&)? ?model)$/i],
-  ["make", /^(make|brand|mærke|marke)$/i], ["model", /^(model)$/i], ["variant", /^(variant|version|model ?text|beskrivelse|description|title)$/i],
+  ["vin", /^(vin|stelnr\.?|stelnummer|chassis( ?nr\.?)?)$/i], ["name", /^(title|car|bil|name|navn|make ?(&|and|\+)? ?model|mærke ?(og|&)? ?model)$/i],
+  ["make", /^(make|brand|mærke|marke)$/i], ["model", /^(model)$/i], ["variant", /^(variant|version|model ?text|beskrivelse|description)$/i],
   ["fuel", /^(fuel|type|brændstof|drivmiddel)$/i], ["hp", /^(hp|hk|power|effekt|ps)$/i], ["km", /^(km|mileage|kilometer|kørt)$/i],
-  ["first_reg", /^(1st ?reg\.?|first ?reg(istration)?\.?|1\. ?reg(\.|istrering)?|year|årgang|reg\.? ?date)$/i],
-  ["price", /^(price|pris|price ?(full ?vat|eur|€)|price \(€\))$/i], ["sold", /^(sold|solgt|status)$/i], ["new", /^(new|ny)$/i],
-  ["color", /^(colou?r|farve)$/i], ["photos_link", /^(pictures|images|billeder|dropbox|photos)$/i], ["body", /^(body|karosseri)$/i], ["co2", /^co2$/i],
+  ["first_reg", /^(1st ?reg\.?( ?date)?|first ?reg(istration)?\.?|1\. ?reg(\.|istrering)?|year|årgang|reg\.? ?date)$/i],
+  ["price_type", /^(price ?type|pristype)$/i], ["price", /^(price|pris|price ?(full ?vat|eur|€)|price \(€\))$/i], ["sold", /^(sold|solgt|status)$/i], ["new", /^(new|ny)$/i],
+  ["color", /^(colou?r|farve)$/i], ["photos_link", /^(pictures|images|billeder|dropbox( ?link)?|photos)$/i], ["body", /^(body|karosseri)$/i], ["co2", /^co2$/i],
 ]
 type Komorka = string | number | boolean | Date | null
 const tekstKomorki = (v: Komorka) => (v instanceof Date ? `${v.getFullYear()}-${String(v.getMonth() + 1).padStart(2, "0")}-${String(v.getDate()).padStart(2, "0")}` : v == null ? "" : String(v))
@@ -211,11 +215,13 @@ export async function czytajExcel(plik: File) {
   return zArkusza((await readSheet(plik)) as Komorka[][])
 }
 
-export type PlikDania = { meta: { stamp_iso: string; rate_value: number }; cars: (Partial<AutoDK> & { id: string; vin?: string | null })[] }
+export type PlikDania = { meta: { stamp_iso: string; rate_value: number }; cars: (Partial<AutoDK> & { id: string; vin?: string | null; new?: boolean })[] }
 
 const ADRES = (import.meta.env.VITE_DANE ?? "https://666dynamic.github.io/autoradar-migawka/data.json").replace("data.json", "dania.json")
 
-// Nocny dania.json; dopóki go nie ma (404), strona działa na samym wklejonym tekście.
+export const TYP_CENY: Record<string, string> = { margin: "margin (z VAT, system marży)", netto: "netto (bez VAT)" }
+
+// Nocny dania.json (główne źródło: API automidt.dk w nocy); dopóki go nie ma (404), strona działa na samym wklejonym tekście.
 export async function wczytajDania(): Promise<PlikDania | null> {
   try {
     const o = await fetch(ADRES, { cache: "no-cache" })
@@ -229,12 +235,13 @@ export async function wczytajDania(): Promise<PlikDania | null> {
 export function polacz(lista: AutoDK[], noc: PlikDania | null): AutoDK[] {
   if (!noc) return lista
   const zNocy = new Map(noc.cars.filter((c) => c.vin).map((c) => [c.vin!, c]))
-  if (!lista.length) return noc.cars.map((c) => ({ ...puste(c.pos ?? 0, c.id, c.title ?? ""), ...c }) as AutoDK)
+  if (!lista.length) return noc.cars.map((c) => ({ ...puste(c.pos ?? 0, c.id, c.title ?? ""), ...c, nowe: !!c.new }) as AutoDK)
   return lista.map((a) => {
     const c = a.vin ? zNocy.get(a.vin) : undefined
     if (!c || a.status !== "pending" || !c.status || !["compared", "error", "no_search"].includes(c.status)) return a
     return { ...a, status: c.status, reason: c.reason ?? null, o_eur: c.o_eur ?? null, d_eur: c.d_eur ?? null, t: c.t ?? null, ok: !!c.ok && a.a_eur === c.a_eur,
-      total: c.total ?? null, compared: c.compared ?? null, search_url: c.search_url ?? null }
+      total: c.total ?? null, compared: c.compared ?? null, search_url: c.search_url ?? null,
+      price_type: a.price_type ?? c.price_type ?? null, a_prev_eur: a.a_prev_eur ?? c.a_prev_eur ?? null }
   })
 }
 
@@ -253,6 +260,6 @@ export function doOgloszenia(a: AutoDK, marza: number, kontakt = ""): Ogloszenie
     paliwo: plugin ? "Hybryda plug-in" : (a.fuel && PL_PALIWO[a.fuel]) || a.type,
     skrzynia: a.gear === "automatic" ? "Automat" : a.gear === "manual" ? "Manualna" : "",
     rejestracja: d ? `${d[3]}.${d[2]}.${d[1]}` : "", przebieg: a.km != null ? String(a.km) : "", moc: a.hp != null ? String(a.hp) : "",
-    cena: a.a_eur != null ? String(a.a_eur + marza) : "", waluta: "eur", kolor: a.color ? KOLORY[a.color.toLowerCase()] ?? a.color : "",
+    cena: a.a_eur != null ? String(a.a_eur + marza) : "", waluta: "eur", typCeny: a.price_type ?? "", kolor: a.color ? KOLORY[a.color.toLowerCase()] ?? a.color : "",
   }
 }

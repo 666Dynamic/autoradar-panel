@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Toggle } from "@/components/ui/toggle"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { fmt } from "@/lib/auta"
-import { STATUSY, czytajExcel, czytajListe, doOgloszenia, polacz, wczytajDania, type AutoDK, type PlikDania, type Status } from "@/lib/dania"
+import { STATUSY, TYP_CENY, czytajExcel, czytajListe, doOgloszenia, polacz, wczytajDania, type AutoDK, type PlikDania, type Status } from "@/lib/dania"
 import { WZORY, ogloszenie } from "@/lib/ogloszenia"
 import { odczytaj, zapisz } from "@/lib/pamiec"
 import { cn } from "@/lib/utils"
@@ -74,7 +74,7 @@ function Post({ auto, marza, kontakt, wzor, ustawWzor, pomin, zamknij }: { auto:
             <DialogHeader>
               <DialogTitle className="pr-6">{auto.title}</DialogTitle>
               <DialogDescription>
-                Cena dostawcy {eur(auto.a_eur)} + marża {eur(marza)} = <b>{eur((auto.a_eur ?? 0) + marza)}</b>{auto.vin ? ` · VIN ${auto.vin}` : ""}
+                Cena dostawcy {eur(auto.a_eur)}{auto.price_type ? ` (${TYP_CENY[auto.price_type] ?? auto.price_type})` : ""} + marża {eur(marza)} = <b>{eur((auto.a_eur ?? 0) + marza)}</b>{auto.vin ? ` · VIN ${auto.vin}` : ""}
               </DialogDescription>
             </DialogHeader>
             <ToggleGroup type="single" variant="outline" className="w-full" value={wzor} onValueChange={(v) => v && ustawWzor(v)}>
@@ -166,7 +166,7 @@ export function Dania() {
         <CardHeader>
           <CardTitle>Lista Auto Midt</CardTitle>
           <CardDescription>
-            Wrzuć plik z przycisku „Export to Excel” na automidt.dk albo wklej listę z maila. Brane są wszystkie auta oprócz „Sold”;
+            Auta przychodzą w nocy z automidt.dk (dania.json). Zapasowo: plik z „Export to Excel” albo lista z maila. Brane są wszystkie auta oprócz „Sold”;
             kwalifikuje się auto z różnicą do średniej Otomoto co najmniej 3.500 € (poniżej 10.000 €) albo 4.500 € (od 10.000 €). Porównanie z Otomoto liczy skaner{noc ? ` (ostatni wynik: ${new Date(noc.meta.stamp_iso).toLocaleString("pl-PL", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })})` : " — wyniku jeszcze nie ma"}.
           </CardDescription>
         </CardHeader>
@@ -224,6 +224,7 @@ export function Dania() {
                   <TableHead className="text-center">Moc</TableHead>
                   <TableHead className="text-center">Paliwo</TableHead>
                   <TableHead className="text-center">Dostawca</TableHead>
+                  <TableHead className="text-center">Cena</TableHead>
                   <TableHead className="text-center">Z marżą</TableHead>
                   <TableHead className="text-center">Otomoto</TableHead>
                   <TableHead className="text-center">Różnica</TableHead>
@@ -244,7 +245,11 @@ export function Dania() {
                       <TableCell className="text-center tabular-nums">{a.km != null ? `${fmt(a.km)} km` : "—"}</TableCell>
                       <TableCell className="text-center tabular-nums">{a.hp != null ? `${a.hp} KM` : "—"}</TableCell>
                       <TableCell className="text-center">{/phev|plug/i.test(a.type) ? "plug-in" : (a.fuel && PALIWO[a.fuel]) || a.type || "—"}{a.gear ? ` · ${a.gear === "automatic" ? "automat" : "manualna"}` : ""}</TableCell>
-                      <TableCell className="text-center tabular-nums">{eur(a.a_eur)}</TableCell>
+                      <TableCell className="text-center tabular-nums">
+                        {eur(a.a_eur)}
+                        {a.a_prev_eur != null && a.a_eur != null && a.a_prev_eur !== a.a_eur && <div className="text-xs text-muted-foreground line-through">{eur(a.a_prev_eur)}</div>}
+                      </TableCell>
+                      <TableCell className="text-center text-xs" title={a.price_type ? TYP_CENY[a.price_type] : undefined}>{a.price_type ?? "—"}</TableCell>
                       <TableCell className="text-center font-medium tabular-nums">{a.a_eur != null ? eur(a.a_eur + marza) : "—"}</TableCell>
                       <TableCell className="text-center tabular-nums">
                         {a.search_url ? <a className="underline-offset-2 hover:underline" href={a.search_url} target="_blank" rel="noopener">{eur(a.o_eur)}</a> : eur(a.o_eur)}

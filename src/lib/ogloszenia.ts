@@ -8,13 +8,15 @@ export const KRAJE_OGLOSZEN: [string, string, string, string][] = [
   ["PL", "Polska", "🇵🇱", ""],
 ]
 
-export const POLA_OGLOSZENIA = { kraj: "DE", auto: "", wersja: "", vin: "", paliwo: "", skrzynia: "", rejestracja: "", przebieg: "", moc: "", cena: "", waluta: "eur", atuty: "", kontakt: "" }
+export const POLA_OGLOSZENIA = { kraj: "DE", auto: "", wersja: "", vin: "", paliwo: "", skrzynia: "", rejestracja: "", przebieg: "", moc: "", cena: "", waluta: "eur", atuty: "", kontakt: "", kolor: "" }
 export type Ogloszenie = typeof POLA_OGLOSZENIA
 
 export const WZORY: [string, string, string][] = [
   ["krotki", "Krótki", "Dane linijka pod linijką, jak dziś na WhatsAppie"],
   ["lista", "Z ikonami", "WhatsApp: pogrubiona nazwa i cena, ikony przy danych"],
   ["pelny", "Pełny", "Facebook lub grupa: nagłówek, opis importu, atuty i kontakt"],
+  ["zamowienie", "Na zamówienie", "Styl strony firmowej: „Możliwość sprowadzenia na zamówienie”, punkty i cena"],
+  ["oferta", "Oferta", "Styl „OFERTA SPROWADZENIA”: dane w jednej linii, wyposażenie, krótko"],
 ]
 
 const kraj = (o: Ogloszenie) => KRAJE_OGLOSZEN.find(([k]) => k === o.kraj)
@@ -89,10 +91,47 @@ export function rozpoznajTekst(tekst: string): Partial<Ogloszenie> {
   return w
 }
 
+// Styl właściciela (facebook.com/autosprowadzone): tysiące spacją w cenie i przebiegu, „04.2018” w linii danych.
+const spacja = (s: string) => (s.trim() === "" ? "" : Number(s.replace(/\D/g, "")).toLocaleString("pl-PL").replace(/\s/g, " "))
+const rok = (o: Ogloszenie) => o.rejestracja.match(/(\d{4})$/)?.[1] ?? ""
+const miesiac = (o: Ogloszenie) => o.rejestracja.match(/(\d{2})[./-](\d{4})$/)?.slice(1).join(".") ?? o.rejestracja
+const pojemnosc = (o: Ogloszenie) => o.wersja.match(/\b(\d\.\d)\b/)?.[1] ?? ""
+
+const W_KRAJU: Record<string, string> = {
+  DE: "w Niemczech", DK: "w Danii", NL: "w Holandii", BE: "w Belgii", FR: "we Francji", SE: "w Szwecji", AT: "w Austrii", IT: "we Włoszech",
+  ES: "w Hiszpanii", LU: "w Luksemburgu", CH: "w Szwajcarii", CZ: "w Czechach",
+}
+
+function wzorWlasciciela(o: Ogloszenie, wzor: string, skad: string) {
+  const kwota = o.cena.trim() ? `${spacja(o.cena)} ${o.waluta === "eur" ? "€" : "zł"}` : ""
+  const nazwa = [o.auto, o.wersja].filter(Boolean).join(" ")
+  if (wzor === "oferta") {
+    const dane = [miesiac(o), o.przebieg.trim() && `${liczba(o.przebieg)} km`, moc(o), o.paliwo.toLowerCase(), o.skrzynia.toLowerCase()].filter(Boolean).join(" · ")
+    return linie(
+      "OFERTA SPROWADZENIA" + (skad ? ` ${skad.toUpperCase()}` : ""), nazwa, dane, o.kolor, ODSTEP, kwota && `Cena: ${kwota}`,
+      ...(atuty(o).length ? [ODSTEP, `Wyposażenie: ${atuty(o).join(", ")}`] : []),
+      ODSTEP, "Zainteresowany? Napisz wiadomość." + (o.kontakt ? ` Tel. ${o.kontakt}` : ""),
+    )
+  }
+  const silnik = [[pojemnosc(o), o.paliwo.toLowerCase()].filter(Boolean).join(" "), moc(o), o.skrzynia.toLowerCase()].filter(Boolean).join(", ")
+  return linie(
+    `Możliwość sprowadzenia na zamówienie: ${o.auto}${rok(o) ? ` (${rok(o)})` : ""}${skad ? ` ${skad}` : ""}`, ODSTEP,
+    W_KRAJU[o.kraj] ? `Nasz zaufany kontrahent ${W_KRAJU[o.kraj]} posiada na sprzedaż następujący pojazd. Możemy zająć się całym procesem jego sprowadzenia.`
+      : "Posiadamy na sprzedaż następujący pojazd.", ODSTEP,
+    nazwa && `• Model: ${nazwa}`, o.rejestracja && `• Data pierwszej rejestracji: ${o.rejestracja}`, silnik && `• Silnik: ${silnik}`,
+    o.przebieg.trim() && `• Przebieg: ${spacja(o.przebieg)} km`, o.kolor && `• Kolor: ${o.kolor}`, o.vin && `• VIN: ${o.vin}`,
+    ...(atuty(o).length ? [ODSTEP, "Najważniejsze informacje o tym egzemplarzu:", ...atuty(o).map((a) => `• ${a}`)] : []),
+    ODSTEP, kwota && `Cena za auto: ${kwota}`, ODSTEP,
+    skad && "Zajmujemy się całością procesu importu: weryfikacją, transportem i formalnościami.", ODSTEP,
+    "Jeśli jesteś zainteresowany sprowadzeniem tego konkretnego egzemplarza lub szukasz podobnego modelu, napisz do nas wiadomość" + (o.kontakt ? ` lub zadzwoń: ${o.kontakt}` : "."),
+  )
+}
+
 // Puste pola znikają z tekstu, więc ogłoszenie da się zrobić z samą nazwą i ceną.
 export function ogloszenie(o: Ogloszenie, wzor: string) {
   const [, , flaga, skad] = kraj(o) ?? ["", "", "", ""]
   const silnik = [o.paliwo, moc(o), o.skrzynia].filter(Boolean).join(" · ")
+  if (wzor === "zamowienie" || wzor === "oferta") return wzorWlasciciela(o, wzor, skad)
   if (wzor === "krotki") {
     return linie(`${flaga} ${o.auto}`.trim(), o.vin, o.wersja, o.paliwo, o.skrzynia, o.rejestracja, przebieg(o), moc(o), cena(o), ...atuty(o).map((a) => `✅ ${a}`), o.kontakt)
   }
@@ -115,4 +154,26 @@ export function ogloszenie(o: Ogloszenie, wzor: string) {
     skad && "Zajmujemy się całym importem: sprawdzeniem auta, transportem i formalnościami.",
     ODSTEP, `📩 Zainteresowany tym autem albo szukasz podobnego? Napisz wiadomość${o.kontakt ? ` lub zadzwoń: ${o.kontakt}` : "."}`,
   )
+}
+
+// „Zrób ogłoszenie” w oknie auta Auto1: numer auta czeka w pamięci karty, podstrona Ogłoszenia go zabiera.
+const KLUCZ_AUTA = "ar_ogloszenie_auto1"
+
+export function zrobOgloszenie(id: string) {
+  try {
+    sessionStorage.setItem(KLUCZ_AUTA, id)
+  } catch {
+    // bez pamięci: strona Ogłoszenia otworzy się pusta
+  }
+  window.location.hash = "#/ogloszenia"
+}
+
+export function autoDoOgloszenia(usun = false) {
+  try {
+    const id = sessionStorage.getItem(KLUCZ_AUTA)
+    if (usun) sessionStorage.removeItem(KLUCZ_AUTA)
+    return id
+  } catch {
+    return null
+  }
 }

@@ -1,5 +1,5 @@
 import * as React from "react"
-import { CheckIcon, CopyIcon, DownloadIcon, ExternalLinkIcon } from "lucide-react"
+import { CheckIcon, CopyIcon, DownloadIcon, ExternalLinkIcon, MegaphoneIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
@@ -15,6 +15,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { dodatki, endLabel, kwota, lokalizacja, offersLabel, oplatyAuto1, pieniadze, specyfikacjaAuta, stawkaAkcyzy, tekstFacebook, tekstWhatsApp, wyposazenieOkna, type Waluta, type Wiersz } from "@/lib/auta"
 import { wczytajSzczegoly, type Szczegoly } from "@/lib/dane"
 import { linkMobile } from "@/lib/mobile"
+import { zrobOgloszenie } from "@/lib/ogloszenia"
 import { pobierzPaczke, zdjeciaAuta } from "@/lib/paczka"
 import { odczytajOferty, odczytajTransport, zapiszOferte, zapiszTransport } from "@/lib/pamiec"
 import { cn } from "@/lib/utils"
@@ -259,6 +260,7 @@ export function OknoAuta({ auto, waluta, kurs, zamknij, widziany }: { auto: Wier
               {auto.search_url && <Button asChild variant="outline" size="sm" className="flex-1"><a href={auto.search_url} target="_blank" rel="noopener" onClick={() => widziany(auto.id)}>Otomoto<ExternalLinkIcon /></a></Button>}
               {mobile && <Button asChild variant="outline" size="sm" className="flex-1"><a href={mobile} target="_blank" rel="noopener">mobile.de<ExternalLinkIcon /></a></Button>}
               {s?.report && <Button asChild variant="outline" size="sm" className="flex-1"><a href={s.report} target="_blank" rel="noopener">Raport<ExternalLinkIcon /></a></Button>}
+              <Button size="sm" className="flex-1" onClick={() => { zamknij(); zrobOgloszenie(auto.id) }}><MegaphoneIcon />Zrób ogłoszenie</Button>
             </div>
             <Ceny auto={auto} waluta={waluta} />
             {szczegoly ? <Zdjecia key={`zdjecia-${auto.id}`} auto={auto} zdjecia={zdjeciaAuta(auto, s)} /> : <p className="text-sm text-muted-foreground">Wczytuję zdjęcia…</p>}

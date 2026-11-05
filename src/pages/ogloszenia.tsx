@@ -11,11 +11,12 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Wybor } from "@/components/wybor"
 import { FUEL, GEAR, wyposazenie } from "@/lib/auta"
 import { wczytajSzczegoly, type Dane } from "@/lib/dane"
-import { KRAJE_OGLOSZEN, POLA_OGLOSZENIA, WZORY, ogloszenie, rozpoznajTekst, type Ogloszenie } from "@/lib/ogloszenia"
+import { KRAJE_OGLOSZEN, POLA_OGLOSZENIA, WZORY, ogloszenie, rozpoznajTekst, autoDoOgloszenia, type Ogloszenie } from "@/lib/ogloszenia"
 
 const PALIWA: [string, string][] = ["Diesel", "Benzyna", "Hybryda", "Hybryda plug-in", "Elektryczny", "Benzyna + LPG"].map((x) => [x, x])
 const SKRZYNIE: [string, string][] = [["Automat", "Automat"], ["Manualna", "Manualna"]]
 const KLUCZ = "ar_ogloszenie"
+
 const wielka = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 // Szkic ogłoszenia i wybrany wzór zostają w tej przeglądarce; kontakt przechodzi do następnego ogłoszenia.
@@ -36,7 +37,8 @@ export function Ogloszenia({ dane }: { dane: Dane | null }) {
   const [szkic] = React.useState(odczytajSzkic)
   const [o, ustawO] = React.useState(szkic.pola)
   const [wzor, ustawWzor] = React.useState(szkic.wzor)
-  const [numer, ustawNumer] = React.useState("")
+  const [zOkna] = React.useState(() => autoDoOgloszenia())
+  const [numer, ustawNumer] = React.useState(zOkna ?? "")
   const [wklejony, ustawWklejony] = React.useState("")
   const [skopiowano, ustawSkopiowano] = React.useState(false)
   const tekst = ogloszenie(o, wzor)
@@ -53,8 +55,8 @@ export function Ogloszenia({ dane }: { dane: Dane | null }) {
   const ustaw = (k: keyof Ogloszenie) => (v: string) => ustawO((x) => ({ ...x, [k]: v }))
 
   // Dane z nocnego skanu: bez ceny sprzedaży i VIN-u, tych Auto1 nie podaje w liście.
-  const wczytaj = async () => {
-    const id = numer.trim().toUpperCase()
+  const wczytajAuto = React.useCallback(async (numerAuta: string) => {
+    const id = numerAuta.trim().toUpperCase()
     const r = dane?.rows.find((x) => x.id.toUpperCase() === id)
     if (!r) return toast.error(dane ? "Nie ma takiego auta w ostatnim skanie." : "Dane skanu jeszcze się wczytują.")
     const s = (await wczytajSzczegoly())[r.id]
@@ -71,9 +73,16 @@ export function Ogloszenia({ dane }: { dane: Dane | null }) {
       przebieg: r.km != null ? String(r.km) : "",
       moc: r.hp != null ? String(r.hp) : "",
       atuty: wyposazenie(s).map(wielka).join("\n"),
+      kolor: typeof s?.colour === "string" ? s.colour : "",
     }))
     toast.success("Wczytano dane auta. Dopisz cenę i VIN.")
-  }
+  }, [dane])
+  const wczytaj = () => wczytajAuto(numer)
+
+  // „Zrób ogłoszenie” w oknie auta Auto1 zostawia numer auta i przechodzi tutaj.
+  React.useEffect(() => {
+    if (zOkna && autoDoOgloszenia(true)) wczytajSzczegoly().then(() => wczytajAuto(zOkna))
+  }, [zOkna, wczytajAuto])
 
   const rozpoznaj = () => {
     const w = rozpoznajTekst(wklejony)
@@ -124,6 +133,7 @@ export function Ogloszenia({ dane }: { dane: Dane | null }) {
                 </ToggleGroup>
               </div>
             </Pole>
+            <Pole etykieta="Kolor"><Input placeholder="szary" {...pole("kolor")} /></Pole>
             <Pole etykieta="Kontakt"><Input placeholder="telefon" {...pole("kontakt")} /></Pole>
             <Pole etykieta="Atuty, każdy w nowej linii" className="flex flex-col gap-1.5 sm:col-span-2">
               <Textarea rows={4} placeholder={"Bezwypadkowe, oryginalny lakier\nSerwis w ASO\nOpony letnie w cenie"} {...pole("atuty")} />

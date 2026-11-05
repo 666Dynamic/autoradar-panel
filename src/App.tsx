@@ -5,6 +5,7 @@ import { SiteHeader } from "@/components/site-header"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { wczytajDane, type Dane } from "@/lib/dane"
 import { Auto1 } from "@/pages/auto1"
+import { Dania } from "@/pages/dania"
 import { Home } from "@/pages/home"
 import { MojeAuta } from "@/pages/moje-auta"
 import { Ogloszenia } from "@/pages/ogloszenia"
@@ -40,7 +41,7 @@ export function App() {
 
   const [odwiedzone, ustawOdwiedzone] = React.useState(() => new Set([strona]))
   if (!odwiedzone.has(strona)) ustawOdwiedzone(new Set(odwiedzone).add(strona))
-  const wymagaDanych = strona !== "wycena" && strona !== "moje-auta" && strona !== "ogloszenia"
+  const wymagaDanych = strona !== "wycena" && strona !== "moje-auta" && strona !== "ogloszenia" && strona !== "dania"
   return (
     <SidebarProvider style={{ "--sidebar-width": "calc(var(--spacing) * 56)", "--header-height": "calc(var(--spacing) * 12)" } as React.CSSProperties}>
       <AppSidebar strona={strona} variant="inset" />
@@ -57,6 +58,8 @@ export function App() {
           {strona === "moje-auta" && <MojeAuta dane={dane} />}
           {/* Ogłoszenia też bez nocnych danych; z danymi można wczytać auto po numerze. */}
           {strona === "ogloszenia" && <Ogloszenia dane={dane} />}
+          {/* Dania: wklejona lista z maila Auto Midt, bez nocnych danych Auto1; zostaje w pamięci jak Auto1. */}
+          {odwiedzone.has("dania") && <div className={strona === "dania" ? "contents" : "hidden"}><Dania /></div>}
         </main>
       </SidebarInset>
     </SidebarProvider>

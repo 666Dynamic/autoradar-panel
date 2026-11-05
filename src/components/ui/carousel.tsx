@@ -93,6 +93,8 @@ function Carousel({
 
   React.useEffect(() => {
     if (!api) return
+    // Kod shadcn: pierwszy odczyt stanu karuzeli po jej utworzeniu (zewnętrzny system), celowo w efekcie.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     onSelect(api)
     api.on("reInit", onSelect)
     api.on("select", onSelect)

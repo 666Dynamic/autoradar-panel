@@ -291,7 +291,8 @@ export function OknoAuta({ auto, waluta, kurs, zamknij, widziany }: { auto: Wier
               {!dk && <Button size="sm" className="flex-1" onClick={() => { zamknij(); zrobOgloszenie(auto.id) }}><MegaphoneIcon />Zrób ogłoszenie</Button>}
             </div>
             <Ceny auto={auto} waluta={waluta} />
-            {dk ? (auto.image ? <img src={auto.image} alt={auto.title} className="mx-auto max-h-[38svh] rounded-lg object-contain" /> : <p className="text-sm text-muted-foreground">Brak zdjęcia głównego, zdjęcia są w folderze dostawcy.</p>)
+            {dk ? (zdjeciaAuta(auto).length ? <Zdjecia key={`zdjecia-${auto.id}`} auto={auto} zdjecia={zdjeciaAuta(auto)} />
+              : <p className="text-sm text-muted-foreground">Brak opublikowanych zdjęć.{dk.dania.folder && <> Zdjęcia są w <a className="underline" href={dk.dania.folder} target="_blank" rel="noopener">folderze dostawcy</a>.</>}</p>)
               : szczegoly ? <Zdjecia key={`zdjecia-${auto.id}`} auto={auto} zdjecia={zdjeciaAuta(auto, s)} /> : <p className="text-sm text-muted-foreground">Wczytuję zdjęcia…</p>}
             <div className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
               <Lista tytul="Auto" wiersze={dk ? [...specyfikacjaAuta(auto), ["Wersja", dk.dania.wersja || "—"], ["Kolor", dk.dania.kolor ?? "—"], ["VIN", dk.dania.vin ?? "—"]]

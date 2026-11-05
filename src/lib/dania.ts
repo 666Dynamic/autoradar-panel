@@ -19,6 +19,7 @@ export type Dania = {
   typCeny: string | null
   folder: string | null // folder zdjęć w Dropboxie
   zip: string | null // ten sam folder jako zip (dl=1)
+  zdjecia: string[] // opublikowane zdjęcia: dania/<VIN>/1.jpg… (pierwsze ze strony dostawcy, reszta z folderu)
   nowe: boolean
   powod: string | null // dlaczego auto nie ma porównania (sprzedane, brak mocy w API…)
 }
@@ -26,6 +27,7 @@ export type Dania = {
 type AutoZPliku = Partial<Auto> & {
   id: string; title: string; status: string; reason: string | null; vin?: string | null; variant?: string; type?: string; color?: string | null
   reg_date?: string | null; price_type?: string | null; photos_link?: string | null; photos_zip?: string | null; new?: boolean
+  images?: string[]
 }
 type PlikDania = { meta: Dane["meta"]; cars: AutoZPliku[] }
 export type AutoDania = Auto & { dania: Dania }
@@ -39,12 +41,13 @@ export function zPliku(plik: PlikDania, adres = ADRES): Dane {
     id: c.id, title: c.title, auto1_url: null, search_url: c.search_url ?? null, note: c.note ?? null,
     reg: c.reg ?? null, fuel: c.fuel ?? null, hp: c.hp ?? null, km: c.km ?? null, unroadworthy: false, gear: c.gear ?? null,
     liters: c.liters ?? null, make: c.make ?? null, model: c.model ?? null, auction: null, body: c.body ?? null,
-    image: c.image ? new URL(c.image, adres).href : null, end_ms: null, bid_eur: null, bid_pln: null,
+    image: c.image ? new URL(c.image, adres).href : null, end_ms: null, bid_eur: null, bid_pln: null, // image: mini.jpg do najechania
     total: c.total ?? null, compared: c.compared ?? null, a_eur: c.a_eur ?? null, a_pln: c.a_pln ?? null, o_eur: c.o_eur ?? null,
     o_pln: c.o_pln ?? null, d_eur: c.d_eur ?? null, d_pln: c.d_pln ?? null, t: c.t ?? null, ok: !!c.ok, a_prev_eur: c.a_prev_eur ?? null,
     dania: {
       vin: c.vin ?? null, wersja: c.variant ?? "", typ: c.type ?? "", kolor: c.color ?? null, rejestracja: c.reg_date ?? null,
       typCeny: c.price_type ?? null, folder: c.photos_link ?? null, zip: c.photos_zip ?? null, nowe: !!c.new,
+      zdjecia: (c.images ?? []).map((z) => new URL(z, adres).href),
       powod: POWODY[c.status] ?? (c.status === "compared" || c.status === "error" ? null : c.reason),
     },
   }))

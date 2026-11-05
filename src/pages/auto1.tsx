@@ -302,7 +302,7 @@ export function Auto1({ dane, dania = false }: { dane: Dane; dania?: boolean }) 
 
   const tabela = useReactTable({
     data: lista, columns: kolumny, getRowId: (r) => r.id, getCoreRowModel: getCoreRowModel(), getPaginationRowModel: getPaginationRowModel(),
-    state: { pagination: strona, rowSelection: zaznaczone, columnVisibility: { ...ukryte, ...(dealerski ? {} : { bid: false, end: false }), ...(dania ? { wybor: false } : {}) } },
+    state: { pagination: strona, rowSelection: zaznaczone, columnVisibility: { ...ukryte, ...(dealerski ? {} : { bid: false, end: false }) } },
     onPaginationChange: ustawStrone, onRowSelectionChange: zmienZaznaczenie, onColumnVisibilityChange: ustawUkryte, autoResetPageIndex: false,
   })
   const wiersze = tabela.getRowModel().rows
@@ -377,7 +377,7 @@ export function Auto1({ dane, dania = false }: { dane: Dane; dania?: boolean }) 
             <Card key={r.id} className={cn(widziane.has(r.id) && "opacity-60", zaznaczone[r.id] && "ring-2 ring-primary")}>
               <CardContent className="flex flex-col gap-2">
                 <div className="flex items-start gap-2">
-                  {!dania && <Checkbox className="mt-1" aria-label={`Zaznacz ${r.id}`} checked={!!zaznaczone[r.id]} onCheckedChange={(v) => tabela.getRow(r.id).toggleSelected(v === true)} />}
+                  <Checkbox className="mt-1" aria-label={`Zaznacz ${r.id}`} checked={!!zaznaczone[r.id]} onCheckedChange={(v) => tabela.getRow(r.id).toggleSelected(v === true)} />
                   <div><button className="text-left font-medium" onClick={() => ustawOtwarte(r)}>{r.title || r.id}</button>{r.unroadworthy && <Niezdatne />}{nowe(r) && <Badge variant="secondary" className="ml-1.5">nowe</Badge>}</div>
                 </div>
                 <p className="text-xs text-muted-foreground">{r.dania ? r.id : `${r.id} · ${r._label}`}<br />{[regLabel(r), kmLabel(r), litersLabel(r), hpLabel(r), r._fuel, r._gear].filter((x) => x !== "—").join(" · ")}</p>
@@ -436,7 +436,7 @@ export function Auto1({ dane, dania = false }: { dane: Dane; dania?: boolean }) 
         <Button variant="outline" size="icon-sm" aria-label="Następna strona" disabled={!tabela.getCanNextPage()} onClick={() => zmienStrone(1)}><ChevronRightIcon /></Button>
       </div>
 
-      {!dania && wybrane.length > 0 && <PasekPaczki wybrane={wybrane} wyczysc={() => zmienZaznaczenie({})} />}
+      {wybrane.length > 0 && <PasekPaczki wybrane={wybrane} wyczysc={() => zmienZaznaczenie({})} />}
       <OknoAuta auto={otwarte} waluta={waluta} kurs={dane.meta.rate_value} zamknij={() => ustawOtwarte(null)} widziany={widziany} />
     </>
   )

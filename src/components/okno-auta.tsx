@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-import { dodatki, endLabel, kwota, lokalizacja, offersLabel, oplatyAuto1, pieniadze, specyfikacjaAuta, stawkaAkcyzy, tekstFacebook, tekstWhatsApp, wyposazenieOkna, type Waluta, type Wiersz } from "@/lib/auta"
+import { dodatki, endLabel, noteLabel, kwota, lokalizacja, offersLabel, oplatyAuto1, pieniadze, specyfikacjaAuta, stawkaAkcyzy, tekstFacebook, tekstWhatsApp, wyposazenieOkna, type Waluta, type Wiersz } from "@/lib/auta"
 import { MARZA, OPIS_TYPU, doOgloszenia, type AutoDania } from "@/lib/dania"
 import { wczytajSzczegoly, type Szczegoly } from "@/lib/dane"
 import { linkMobile } from "@/lib/mobile"
@@ -169,7 +169,7 @@ function Ceny({ auto, waluta }: { auto: Wiersz; waluta: Waluta }) {
   const plus = (n: number | null, w: Waluta) => (n !== null && n > 0 ? "+" : "") + pieniadze(n, w)
   return (
     <div className="grid grid-cols-3 gap-2">
-      <Liczba tytul={auto.dania ? "Dostawca" : "Auto1"} opis={auto.dania?.typCeny ?? undefined} glowna={pieniadze(kwota(auto, "a", waluta), waluta)} mala={pieniadze(kwota(auto, "a", druga(waluta)), druga(waluta))} />
+      <Liczba tytul={auto.dania ? "Auto Midt" : "Auto1"} opis={auto.dania?.typCeny ?? undefined} glowna={pieniadze(kwota(auto, "a", waluta), waluta)} mala={pieniadze(kwota(auto, "a", druga(waluta)), druga(waluta))} />
       <Liczba tytul="Otomoto" opis={auto.compared ? `średnia z ${auto.compared}` : undefined} glowna={pieniadze(kwota(auto, "o", waluta), waluta)} mala={pieniadze(kwota(auto, "o", druga(waluta)), druga(waluta))} />
       <Liczba tytul="Różnica" glowna={plus(d, waluta)} mala={plus(kwota(auto, "d", druga(waluta)) ?? null, druga(waluta))} className={kolor(d)} />
     </div>
@@ -295,7 +295,7 @@ export function OknoAuta({ auto, waluta, kurs, zamknij, widziany }: { auto: Wier
               // Dania: jedno zdjęcie ze strony dostawcy; komplet jest w jego folderze Dropbox.
               <div className="flex flex-col gap-2">
                 {zdjeciaAuta(auto).length ? <img src={zdjeciaAuta(auto)[0]} alt={auto.title} className="mx-auto max-h-[38svh] rounded-lg object-contain" />
-                  : <p className="text-sm text-muted-foreground">Dostawca nie ma jeszcze zdjęcia tego auta na stronie.</p>}
+                  : <p className="text-sm text-muted-foreground">Zdjęcia jeszcze nie ma w panelu: serwer dociąga je co rano partiami. Wszystkie zdjęcia są w Dropboxie.</p>}
                 {dk.dania.folder && <Button asChild variant="outline" size="sm"><a href={dk.dania.folder} target="_blank" rel="noopener"><FolderOpenIcon />Więcej zdjęć (Dropbox)<ExternalLinkIcon /></a></Button>}
               </div>
             )
@@ -305,9 +305,9 @@ export function OknoAuta({ auto, waluta, kurs, zamknij, widziany }: { auto: Wier
                 : [...specyfikacjaAuta(auto), ...dodatki(s), ["Lokalizacja", lokalizacja(s)]]} />
               {dk ? <Lista tytul="Dostawca" wiersze={[["Dostawca", "Auto Midt (Dania)"],
                 ["Typ ceny", dk.dania.typCeny ? `${dk.dania.typCeny}, ${OPIS_TYPU[dk.dania.typCeny] ?? ""}`.replace(/, $/, "") : "—"],
-                ...(dk.a_prev_eur != null && dk.a_prev_eur !== dk.a_eur ? [["Poprzednia cena", pieniadze(waluta === "eur" ? dk.a_prev_eur : dk.a_prev_eur * kurs, waluta)] as [string, string]] : []),
+                ...(dk.a_prev_eur != null && dk.a_prev_eur !== dk.a_eur ? [["Poprzednia cena u Auto Midt", pieniadze(waluta === "eur" ? dk.a_prev_eur : dk.a_prev_eur * kurs, waluta)] as [string, string]] : []),
                 ["Próg różnicy", pieniadze(auto.t === null ? null : waluta === "eur" ? auto.t : auto.t * kurs, waluta)],
-                ["Ofert Otomoto", offersLabel(auto)], ...(dk.dania.powod ? [["Bez porównania", dk.dania.powod] as [string, string]] : [])]} />
+                ["Ofert Otomoto", offersLabel(auto)], ...(auto.d_eur === null ? [["Bez porównania", dk.dania.powod ?? noteLabel(auto.note)] as [string, string]] : [])]} />
               : <Lista tytul="Aukcja" wiersze={[["Typ aukcji", auto._label],
                 ...(auto.end_ms != null ? [["Koniec aukcji", endLabel(auto)] as [string, string]] : []),
                 ...(auto._dealer ? [["Licytuj do", pieniadze(kwota(auto, "bid", waluta), waluta)] as [string, string]] : []),

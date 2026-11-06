@@ -33,7 +33,8 @@ type PlikDania = { meta: Dane["meta"]; cars: AutoZPliku[] }
 export type AutoDania = Auto & { dania: Dania }
 
 const ADRES = (import.meta.env.VITE_DANE ?? "https://666dynamic.github.io/autoradar-migawka/data.json").replace("data.json", "dania.json")
-const POWODY: Record<string, string> = { sold: "sprzedane u dostawcy", duplicate: "ten sam VIN wyżej na liście" }
+// Powód braku porównania po polsku; reszta (brak ofert, model poza katalogiem) idzie przez noteLabel jak w Auto1.
+const POWODY: Record<string, string> = { sold: "sprzedane u dostawcy", duplicate: "ten sam VIN wyżej na liście", unparsed: "dostawca nie podał mocy" }
 
 // dania.json → ten sam kształt co data.json Auto1 (bez nocy i skanu: strona Dania ich nie pokazuje).
 export function zPliku(plik: PlikDania, adres = ADRES): Dane {
@@ -48,7 +49,7 @@ export function zPliku(plik: PlikDania, adres = ADRES): Dane {
       vin: c.vin ?? null, wersja: c.variant ?? "", typ: c.type ?? "", kolor: c.color ?? null, rejestracja: c.reg_date ?? null,
       typCeny: c.price_type ?? null, folder: c.photos_link ?? null, zip: c.photos_zip ?? null, nowe: !!c.new,
       zdjecia: (c.images ?? []).map((z) => new URL(z, adres).href),
-      powod: POWODY[c.status] ?? (c.status === "compared" || c.status === "error" ? null : c.reason),
+      powod: POWODY[c.status] ?? null,
     },
   }))
   return { meta: plik.meta, scan: {} as Dane["scan"], nights: [], rows }

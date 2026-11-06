@@ -26,7 +26,7 @@ import { linkMobile } from "@/lib/mobile"
 import { odczytaj, zapisz } from "@/lib/pamiec"
 import { cn } from "@/lib/utils"
 
-const POCZATEK = { onlyOk: false, small: false, noBroken: false, nowe: false, zmiany: false, dostawcze: [] as string[], pMin: "", pMax: "", dMin: "", yMin: "", yMax: "", kmMin: "", kmMax: "", offersMin: [] as string[], fuel: [] as string[], gear: [] as string[], auction: [] as string[] }
+const POCZATEK = { typCeny: [] as string[], onlyOk: false, small: false, noBroken: false, nowe: false, zmiany: false, dostawcze: [] as string[], pMin: "", pMax: "", dMin: "", yMin: "", yMax: "", kmMin: "", kmMax: "", offersMin: [] as string[], fuel: [] as string[], gear: [] as string[], auction: [] as string[] }
 const VIEWS: [string, string][] = [["24h", "Aukcje i zakup"], ["dealer", "Aukcje dealerskie"], ["all", "Wszystkie"]]
 const ROZMIARY: [string, string][] = [["100", "100"], ["300", "300"]]
 const CENY: Record<Waluta, number[]> = {
@@ -40,9 +40,12 @@ const ROZNICE: Record<Waluta, number[]> = {
 const PRZEBIEGI = Array.from({ length: 12 }, (_, i) => (i + 1) * 25000)
 // Sortowanie w telefonie, gdzie nie ma nagłówków tabeli.
 const SORTY: [string, string][] = [["d:-1", "Największa różnica"], ["km:1", "Najmniejszy przebieg"], ["a:1", "Najniższa cena Auto1"], ["reg:-1", "Najnowszy rocznik"], ["hp:-1", "Największa moc"]]
-const SORTY_DANIA = SORTY.map(([k, n]): [string, string] => [k, n.replace("Auto1", "dostawcy")])
+const SORTY_DANIA = SORTY.map(([k, n]): [string, string] => [k, n.replace("Auto1", "Auto Midt")])
 const OFERTY: [string, string][] = [["1", "co najmniej 1"], ["2", "co najmniej 2"], ["3", "co najmniej 3"], ["4", "co najmniej 4"], ["5", "5"]]
 const TYPY: [string, string][] = [["bez", "Bez dostawczych"], ["tylko", "Tylko dostawcze"]]
+const TYPY_CENY: [string, string][] = [["margin", "margin (z duńskim VAT)"], ["netto", "netto (bez VAT)"]]
+// Dania od razu pokazuje tylko kwalifikujące się auta; „Wyczyść filtry” wraca do tego widoku.
+const POCZATEK_DANIA = { ...POCZATEK, onlyOk: true }
 const NAZWY_KOLUMN: Record<string, string> = { reg: "Rocznik", liters: "Poj.", km: "Przebieg", hp: "Moc", fuel: "Paliwo", gear: "Skrzynia", a: "Auto1", o: "Otomoto", d: "Różnica", bid: "Licytuj do", end: "Koniec", offers: "Ofert", link: "Link" }
 const DO_LEWEJ = new Set(["wybor", "name"]) // reszta kolumn wyśrodkowana, nagłówek nad wartością
 const liczba = (s: string) => (s === "" ? null : Number(s))
@@ -56,8 +59,8 @@ function Opis({ tekst, children }: { tekst?: string; children: React.ReactElemen
 
 // Dania (dania.json): ta sama tabela, cena „a” to cena dostawcy Auto Midt.
 const CzyDania = React.createContext(false)
-const nazwaKolumny = (id: string, dania: boolean) => (dania && id === "a" ? "Dostawca" : NAZWY_KOLUMN[id])
-const OPIS_DOSTAWCY = "Cena dostawcy z listy Auto Midt: margin z duńskim VAT (system marży), netto bez VAT. Przekreślona: poprzednia cena"
+const nazwaKolumny = (id: string, dania: boolean) => (dania && id === "a" ? "Auto Midt" : NAZWY_KOLUMN[id])
+const OPIS_DOSTAWCY = "Cena z listy Auto Midt: margin z duńskim VAT (system marży), netto bez VAT. Strzałka: zmiana od poprzedniej ceny na liście Auto Midt"
 
 const OPISY: Record<string, string> = {
   a: "Cena z nocy, na aukcji mogła już wzrosnąć. Strzałka: zmiana od poprzedniej nocy",
@@ -69,20 +72,10 @@ const OPISY: Record<string, string> = {
 // Cena Auto1 i jej zmiana od poprzedniej nocy: taniej na zielono.
 function CenaAuto1({ r, waluta, kurs }: { r: Wiersz; waluta: Waluta; kurs: number }) {
   const zmiana = zmianaCeny(r)
-  if (r.dania) {
-    // Dania: mała etykieta margin/netto i przekreślona poprzednia cena dostawcy.
-    const przed = r.a_prev_eur == null || zmiana === 0 ? null : waluta === "eur" ? r.a_prev_eur : r.a_prev_eur * kurs
-    return (
-      <>
-        {pieniadze(kwota(r, "a", waluta), waluta)}
-        {r.dania.typCeny && <span className="block text-xs text-muted-foreground">{r.dania.typCeny}</span>}
-        {przed !== null && <span className="block text-xs text-muted-foreground line-through">{pieniadze(przed, waluta)}</span>}
-      </>
-    )
-  }
   return (
     <>
       {pieniadze(kwota(r, "a", waluta), waluta)}
+      {r.dania?.typCeny && <span className="block text-xs text-muted-foreground">{r.dania.typCeny}</span>}
       {zmiana !== 0 && (
         <span className={cn("block text-xs", zmiana < 0 ? "text-success" : "text-muted-foreground")}>
           {zmiana < 0 ? "↓" : "↑"} {pieniadze(Math.abs(waluta === "eur" ? zmiana : zmiana * kurs), waluta)}
@@ -114,7 +107,8 @@ function Niezdatne() {
 }
 
 function Roznica({ r, waluta, kurs }: { r: Wiersz; waluta: Waluta; kurs: number }) {
-  if (r.d_eur === null) return <span className="text-xs text-muted-foreground">{r.dania?.powod ?? noteLabel(r.note)}</span>
+  // Powód w kilku liniach: długi nie może rozpychać kolumny i spychać Ofert i Linków poza ekran.
+  if (r.d_eur === null) return <span className="inline-block max-w-40 text-xs whitespace-normal text-muted-foreground">{r.dania?.powod ?? noteLabel(r.note)}</span>
   const prog = waluta === "pln" && r.t !== null ? r.t * kurs : r.t
   const kwotaRoznicy = pieniadze(kwota(r, "d", waluta), waluta)
   return (
@@ -194,7 +188,8 @@ export function Auto1({ dane, dania = false }: { dane: Dane; dania?: boolean }) 
   const [widok, ustawWidok] = React.useState(dania ? "all" : "24h") // Dania nie ma aukcji
   const [waluta, ustawWalute] = React.useState<Waluta>("eur")
   const [sort, ustawSort] = React.useState<Sort>({ key: "rank", dir: -1 })
-  const [f, ustawF] = React.useState(POCZATEK)
+  const start = dania ? POCZATEK_DANIA : POCZATEK
+  const [f, ustawF] = React.useState(start)
   const [tekst, ustawTekst] = React.useState("")
   const [strona, ustawStrone] = React.useState<PaginationState>({ pageIndex: 0, pageSize: 50 })
   const [otwarte, ustawOtwarte] = React.useState<Wiersz | null>(null)
@@ -228,6 +223,7 @@ export function Auto1({ dane, dania = false }: { dane: Dane; dania?: boolean }) 
       && (kmMin === null || (r.km != null && r.km >= kmMin)) && (kmMax === null || (r.km != null && r.km <= kmMax))
       && (offersMin === null || (r.compared ?? 0) >= offersMin)
       && (f.dostawcze[0] !== "bez" || r.body !== "commercial") && (f.dostawcze[0] !== "tylko" || r.body === "commercial") && (!f.noBroken || !r.unroadworthy) && (!f.nowe || nowe(r)) && (!f.zmiany || zmianaCeny(r) !== 0)
+      && (!f.typCeny.length || f.typCeny.includes(r.dania?.typCeny ?? ""))
       && (!f.fuel.length || f.fuel.includes(r._fuel)) && (!f.gear.length || f.gear.includes(r._gear)) && (!f.auction.length || f.auction.includes(r._label))
       && pasuje(r, s)).sort((a, b) => porownaj(a, b, sort, waluta))
   }, [auta, wWidoku, f, s, sort, waluta, nowe])
@@ -270,7 +266,7 @@ export function Auto1({ dane, dania = false }: { dane: Dane; dania?: boolean }) 
     return n
   })
   const wybrane = React.useMemo(() => auta.filter((r) => zaznaczone[r.id]), [auta, zaznaczone])
-  const aktywneFiltry = JSON.stringify(f) !== JSON.stringify(POCZATEK) || tekst !== ""
+  const aktywneFiltry = JSON.stringify(f) !== JSON.stringify(start) || tekst !== ""
   const zmienStrone = (krok: number) => {
     tabela.setPageIndex((i) => i + krok)
     poczatekListy.current?.querySelector("[data-slot=table-container]")?.scrollTo(0, 0)
@@ -320,10 +316,11 @@ export function Auto1({ dane, dania = false }: { dane: Dane; dania?: boolean }) 
       <div className="flex flex-wrap items-center gap-2">
         <Input className="h-9 w-full sm:h-7 sm:w-64" type="search" placeholder="Numer, marka, model" aria-label="Szukaj" value={tekst} onChange={(e) => { ustawTekst(e.target.value); pierwsza() }} />
         {!dania && <FiltrLista tytul="Typ aukcji" opcje={typy} wybrane={f.auction} zmien={(v) => pole("auction", v)} />}
+        {dania && <FiltrLista tytul="Typ ceny" opcje={TYPY_CENY} wybrane={f.typCeny} zmien={(v) => pole("typCeny", v)} />}
         <FiltrLista tytul="Paliwo" opcje={opcje("_fuel")} wybrane={f.fuel} zmien={(v) => pole("fuel", v)} />
         <FiltrLista tytul="Skrzynia" opcje={opcje("_gear")} wybrane={f.gear} zmien={(v) => pole("gear", v)} />
         <FiltrLista tytul="Typ auta" opcje={TYPY} wybrane={f.dostawcze} zmien={(v) => pole("dostawcze", v)} jeden />
-        <FiltrZakres tytul={`Cena ${dania ? "dostawcy" : "Auto1"} (${waluta === "eur" ? "€" : "zł"})`} opcje={kroki(CENY[waluta], (n) => pieniadze(n, waluta))} od={f.pMin} do={f.pMax} zmienOd={(v) => pole("pMin", v)} zmienDo={(v) => pole("pMax", v)} />
+        <FiltrZakres tytul={`Cena ${dania ? "Auto Midt" : "Auto1"} (${waluta === "eur" ? "€" : "zł"})`} opcje={kroki(CENY[waluta], (n) => pieniadze(n, waluta))} od={f.pMin} do={f.pMax} zmienOd={(v) => pole("pMin", v)} zmienDo={(v) => pole("pMax", v)} />
         <FiltrLista tytul={`Różnica (${waluta === "eur" ? "€" : "zł"})`} opcje={kroki(ROZNICE[waluta], (n) => "co najmniej " + pieniadze(n, waluta))} wybrane={f.dMin ? [f.dMin] : []} zmien={(v) => pole("dMin", v[0] ?? "")} jeden />
         <FiltrZakres tytul="Rocznik" opcje={lata} od={f.yMin} do={f.yMax} zmienOd={(v) => pole("yMin", v)} zmienDo={(v) => pole("yMax", v)} />
         <FiltrZakres tytul="Przebieg" opcje={kroki(PRZEBIEGI, (n) => `${n / 1000} tys. km`)} od={f.kmMin} do={f.kmMax} zmienOd={(v) => pole("kmMin", v)} zmienDo={(v) => pole("kmMax", v)} />
@@ -338,10 +335,10 @@ export function Auto1({ dane, dania = false }: { dane: Dane; dania?: boolean }) 
         {zHistoria && (
           <Tooltip>
             <TooltipTrigger asChild><Toggle variant="outline" size="sm" pressed={f.zmiany} onPressedChange={(v) => pole("zmiany", v)}>Zmiana ceny ({ileZmian})</Toggle></TooltipTrigger>
-            <TooltipContent>{dania ? "Cena dostawcy zmieniona, poprzednia przekreślona przy cenie" : "Cena Auto1 inna niż poprzedniej nocy, strzałka przy cenie"}</TooltipContent>
+            <TooltipContent>{dania ? "Cena na liście Auto Midt inna niż poprzednia, strzałka przy cenie" : "Cena Auto1 inna niż poprzedniej nocy, strzałka przy cenie"}</TooltipContent>
           </Tooltip>
         )}
-        {aktywneFiltry && <Button variant="ghost" size="sm" onClick={() => { ustawF(POCZATEK); ustawTekst(""); pierwsza() }}>Wyczyść filtry<XIcon /></Button>}
+        {aktywneFiltry && <Button variant="ghost" size="sm" onClick={() => { ustawF(start); ustawTekst(""); pierwsza() }}>Wyczyść filtry<XIcon /></Button>}
       </div>
 
       <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">

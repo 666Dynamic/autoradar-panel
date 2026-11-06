@@ -255,8 +255,8 @@ function PostDania({ auto }: { auto: AutoDania }) {
         <TabsContent value="whatsapp"><Tekst id={auto.id} rodzaj="whatsapp" domyslny={ogloszenie(o, "whatsapp")} /></TabsContent>
       </Tabs>
       <div className="flex flex-wrap gap-2">
-        {auto.dania.zip && <Button asChild size="sm" className="flex-1"><a href={auto.dania.zip} download><DownloadIcon />Pobierz zdjęcia</a></Button>}
-        {auto.dania.folder && <Button asChild variant="outline" size="sm" className="flex-1"><a href={auto.dania.folder} target="_blank" rel="noopener"><FolderOpenIcon />Folder zdjęć</a></Button>}
+        {/* Zip z Dropboxa (dl=1) pobiera przeglądarka, serwer niczego z Dropboxa nie pobiera. */}
+        {auto.dania.zip && <Button asChild size="sm" className="flex-1"><a href={auto.dania.zip} target="_blank" rel="noopener"><DownloadIcon />Pobierz zdjęcia</a></Button>}
       </div>
       <p className="text-xs text-muted-foreground">
         Cena w poście: cena dostawcy + {pieniadze(MARZA, "eur")}.{!auto.dania.folder && " Dostawca nie podał folderu zdjęć."}
@@ -291,8 +291,14 @@ export function OknoAuta({ auto, waluta, kurs, zamknij, widziany }: { auto: Wier
               {!dk && <Button size="sm" className="flex-1" onClick={() => { zamknij(); zrobOgloszenie(auto.id) }}><MegaphoneIcon />Zrób ogłoszenie</Button>}
             </div>
             <Ceny auto={auto} waluta={waluta} />
-            {dk ? (zdjeciaAuta(auto).length ? <Zdjecia key={`zdjecia-${auto.id}`} auto={auto} zdjecia={zdjeciaAuta(auto)} />
-              : <p className="text-sm text-muted-foreground">Brak opublikowanych zdjęć.{dk.dania.folder && <> Zdjęcia są w <a className="underline" href={dk.dania.folder} target="_blank" rel="noopener">folderze dostawcy</a>.</>}</p>)
+            {dk ? (
+              // Dania: jedno zdjęcie ze strony dostawcy; komplet jest w jego folderze Dropbox.
+              <div className="flex flex-col gap-2">
+                {zdjeciaAuta(auto).length ? <img src={zdjeciaAuta(auto)[0]} alt={auto.title} className="mx-auto max-h-[38svh] rounded-lg object-contain" />
+                  : <p className="text-sm text-muted-foreground">Dostawca nie ma jeszcze zdjęcia tego auta na stronie.</p>}
+                {dk.dania.folder && <Button asChild variant="outline" size="sm"><a href={dk.dania.folder} target="_blank" rel="noopener"><FolderOpenIcon />Więcej zdjęć (Dropbox)<ExternalLinkIcon /></a></Button>}
+              </div>
+            )
               : szczegoly ? <Zdjecia key={`zdjecia-${auto.id}`} auto={auto} zdjecia={zdjeciaAuta(auto, s)} /> : <p className="text-sm text-muted-foreground">Wczytuję zdjęcia…</p>}
             <div className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
               <Lista tytul="Auto" wiersze={dk ? [...specyfikacjaAuta(auto), ["Wersja", dk.dania.wersja || "—"], ["Kolor", dk.dania.kolor ?? "—"], ["VIN", dk.dania.vin ?? "—"]]

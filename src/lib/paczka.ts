@@ -10,7 +10,7 @@ import { odczytajOferty } from "@/lib/pamiec"
 const POSREDNIK = "https://wycena-aut.hfnvflmwxetmfpc.workers.dev/?zdjecie="
 const NARAZ = 4
 
-// Dania: zdjęcia z folderu dostawcy opublikowane przy dania.json; Auto1: szczegoly.json.
+// Dania: zdjęcie ze strony dostawcy opublikowane przy dania.json; Auto1: szczegoly.json.
 export const zdjeciaAuta = (r: Wiersz, s?: Szczegoly) => (r.dania?.zdjecia.length ? r.dania.zdjecia : s?.images.length ? s.images : r.image ? [r.image] : [])
 const nazwa = (tekst: string) => tekst.normalize("NFD").replace(/ł/g, "l").replace(/Ł/g, "L").replace(/[^A-Za-z0-9 .-]/g, "").trim().slice(0, 60) || "auto"
 

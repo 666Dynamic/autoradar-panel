@@ -19,7 +19,7 @@ export type Dania = {
   typCeny: string | null
   folder: string | null // folder zdjęć w Dropboxie
   zip: string | null // ten sam folder jako zip (dl=1)
-  zdjecia: string[] // opublikowane zdjęcia: dania/<VIN>/1.jpg… (pierwsze ze strony dostawcy, reszta z folderu)
+  zdjecia: string[] // opublikowane zdjęcie ze strony dostawcy: [dania/<VIN>/1.jpg] albo []
   nowe: boolean
   powod: string | null // dlaczego auto nie ma porównania (sprzedane, brak mocy w API…)
 }

@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Wybor } from "@/components/wybor"
 import { pieniadze } from "@/lib/auta"
 
-// Skrypty strony wyceny, bez zmian: public/wycena/catalog.js i filtry.js.
+// Skrypty strony wyceny, bez zmian: public/wycena/catalog.js i filtry.js (ładuje je App.tsx przed tą stroną).
 declare const KATALOG: { makes: [string, string][]; models: Record<string, [string, string][]> }
 type Rozpoznane = Partial<Record<"marka" | "model" | "paliwo" | "skrzynia" | "rok" | "moc" | "przebieg", string | number>>
 declare const FILTRY: {

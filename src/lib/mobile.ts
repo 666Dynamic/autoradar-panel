@@ -19,6 +19,7 @@ const DODATKOWE: Record<string, string[]> = {
   "audi|a4avant": ["1900;9"], "audi|a3sportback": ["1900;8"], "audi|etron": ["1900;50"],
   "suzuki|scross": ["23600;12"], "suzuki|across": ["23600;342"], "hyundai|ioniq": ["11600;40"],
   "mercedesbenz|cla": ["17200;;45"], "mercedesbenz|gla": ["17200;;54"], "mercedesbenz|glb": ["17200;;66"], "mercedesbenz|glc": ["17200;;59"], "mercedesbenz|eqe": ["17200;352"],
+  "bmw|i3": ["3500;79"], "bmw|i4": ["3500;330"], "bmw|i5": ["3500;341"], "bmw|i7": ["3500;336"], "bmw|ix": ["3500;331"], "bmw|ix1": ["3500;337"], "bmw|ix2": ["3500;346"], "bmw|ix3": ["3500;329"],
   "mini|cooper": WYBOR["MINI|MINI|Cooper"], "seat|leonfrsportstourer": ["22500;9"], "nissan|pulsar": ["18700;58"], "cupra|formentor": ["3;5"], "tesla|modely": ["135;6"], "polestar|2": ["4;3"], "nio|et5": ["31954;3"],
 }
 const normalny = (k: string) => k.toLowerCase().replace(/[^a-z0-9|]/g, "")

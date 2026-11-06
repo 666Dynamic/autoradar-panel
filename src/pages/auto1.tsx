@@ -19,9 +19,10 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Wybor } from "@/components/wybor"
 import { useIsMobile } from "@/hooks/use-mobile"
-import { AUCTION_LABELS, endLabel, hpLabel, kmLabel, kwota, litersLabel, noteLabel, offersLabel, pasuje, pieniadze, porownaj, przygotuj, regLabel, szukane, zmianaCeny, type Sort, type Waluta, type Wiersz } from "@/lib/auta"
+import { AUCTION_LABELS, endLabel, hpLabel, kmLabel, kwota, litersLabel, offersLabel, powodBraku, zakonczona, pasuje, pieniadze, porownaj, przygotuj, regLabel, szukane, zmianaCeny, type Sort, type Waluta, type Wiersz } from "@/lib/auta"
 import type { Dane } from "@/lib/dane"
 import { pobierzPaczke } from "@/lib/paczka"
+import { OPIS_OSTRZEZEN, ostrzezenie } from "@/lib/ostrzezenia"
 import { linkMobile } from "@/lib/mobile"
 import { odczytaj, zapisz } from "@/lib/pamiec"
 import { cn } from "@/lib/utils"
@@ -108,15 +109,18 @@ function Niezdatne() {
 
 function Roznica({ r, waluta, kurs }: { r: Wiersz; waluta: Waluta; kurs: number }) {
   // Powód w kilku liniach: długi nie może rozpychać kolumny i spychać Ofert i Linków poza ekran.
-  if (r.d_eur === null) return <span className="inline-block max-w-40 text-xs whitespace-normal text-muted-foreground">{r.dania?.powod ?? noteLabel(r.note)}</span>
+  if (r.d_eur === null) return <span className="inline-block max-w-40 text-xs whitespace-normal text-muted-foreground">{r.dania?.powod ?? powodBraku(r)}</span>
   const prog = waluta === "pln" && r.t !== null ? r.t * kurs : r.t
   const kwotaRoznicy = pieniadze(kwota(r, "d", waluta), waluta)
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        {r.ok ? <Badge className="bg-success/15 text-success">{kwotaRoznicy}</Badge> : <span>{kwotaRoznicy}</span>}
+        <span className="inline-flex flex-col items-center">
+          {r.ok ? <Badge className="bg-success/15 text-success">{kwotaRoznicy}</Badge> : <span>{kwotaRoznicy}</span>}
+          {ostrzezenie(r) && <span className="text-xs text-warning">{ostrzezenie(r)}</span>}
+        </span>
       </TooltipTrigger>
-      <TooltipContent>Próg: {pieniadze(prog, waluta)}</TooltipContent>
+      <TooltipContent>Próg: {pieniadze(prog, waluta)}{ostrzezenie(r) && ` · ${OPIS_OSTRZEZEN[ostrzezenie(r)!]}`}</TooltipContent>
     </Tooltip>
   )
 }
@@ -193,8 +197,8 @@ export function Auto1({ dane, dania = false }: { dane: Dane; dania?: boolean }) 
   const [tekst, ustawTekst] = React.useState("")
   const [strona, ustawStrone] = React.useState<PaginationState>({ pageIndex: 0, pageSize: 50 })
   const [otwarte, ustawOtwarte] = React.useState<Wiersz | null>(null)
-  const [zaznaczone, ustawZaznaczone] = React.useState<RowSelectionState>(() => Object.fromEntries(odczytaj("ar_picked").map((id) => [id, true])))
-  const [widziane, ustawWidziane] = React.useState(() => new Set(odczytaj("ar_seen")))
+  const [zaznaczone, ustawZaznaczone] = React.useState<RowSelectionState>(() => Object.fromEntries(odczytaj(dania ? "ar_dk_picked" : "ar_picked").map((id) => [id, true])))
+  const [widziane, ustawWidziane] = React.useState(() => new Set(odczytaj(dania ? "ar_dk_seen" : "ar_seen")))
   const [ukryte, ustawUkryte] = React.useState<VisibilityState>({})
   const poczatekListy = React.useRef<HTMLDivElement>(null)
 
@@ -257,14 +261,14 @@ export function Auto1({ dane, dania = false }: { dane: Dane; dania?: boolean }) 
   }), [sort])
   const zmienZaznaczenie = (zmiana: React.SetStateAction<RowSelectionState>) => ustawZaznaczone((x) => {
     const n = typeof zmiana === "function" ? zmiana(x) : zmiana
-    zapisz("ar_picked", Object.keys(n))
+    zapisz(dania ? "ar_dk_picked" : "ar_picked", Object.keys(n)) // Dania osobno: obie strony żyją naraz i nadpisywały sobie listy
     return n
   })
-  const widziany = (id: string) => ustawWidziane((x) => {
+  const widziany = React.useCallback((id: string) => ustawWidziane((x) => {
     const n = new Set(x).add(id)
-    zapisz("ar_seen", [...n])
+    zapisz(dania ? "ar_dk_seen" : "ar_seen", [...n])
     return n
-  })
+  }), [dania])
   const wybrane = React.useMemo(() => auta.filter((r) => zaznaczone[r.id]), [auta, zaznaczone])
   const aktywneFiltry = JSON.stringify(f) !== JSON.stringify(start) || tekst !== ""
   const zmienStrone = (krok: number) => {
@@ -281,9 +285,9 @@ export function Auto1({ dane, dania = false }: { dane: Dane; dania?: boolean }) 
         cell: ({ row }) => <Checkbox aria-label={`Zaznacz ${row.id}`} checked={row.getIsSelected()} onCheckedChange={(v) => row.toggleSelected(v === true)} /> },
       { id: "name", enableHiding: false, header: () => <Naglowek klucz="name">Auto</Naglowek>,
         cell: ({ row: { original: r } }) => (
-          <div className="min-w-60 whitespace-normal">
+          <div className="min-w-40 whitespace-normal">
             <div className="flex items-start">{/* długie nazwy dealerskie: najwyżej dwie linie, pełna po najechaniu */}<Nazwa r={r} otworz={ustawOtwarte} />{r.unroadworthy && <Niezdatne />}</div>
-            <div className="text-xs text-muted-foreground">{r.dania ? r.id : `${r.id} · ${r._label}`}{nowe(r) && <Badge variant="secondary" className="ml-1.5">nowe</Badge>}</div>
+            <div className="text-xs text-muted-foreground">{r.dania ? r.id : `${r.id} · ${r._label}`}{nowe(r) && <Badge variant="secondary" className="ml-1.5">nowe</Badge>}{zakonczona(r) && <Badge variant="outline" className="ml-1.5">zakończona</Badge>}</div>
           </div>
         ) },
       zwykla("reg", regLabel), zwykla("liters", litersLabel), zwykla("km", kmLabel), zwykla("hp", hpLabel), zwykla("fuel", (r) => r._fuel), zwykla("gear", (r) => r._gear),
@@ -294,7 +298,7 @@ export function Auto1({ dane, dania = false }: { dane: Dane; dania?: boolean }) 
       zwykla("offers", offersLabel),
       { id: "link", header: () => <Opis tekst={OPISY.link}><span className="px-2">Link</span></Opis>, cell: ({ row: { original: r } }) => <Linki r={r} widziany={widziany} /> },
     ]
-  }, [waluta, dane, nowe, dania])
+  }, [waluta, dane, nowe, dania, widziany])
 
   const tabela = useReactTable({
     data: lista, columns: kolumny, getRowId: (r) => r.id, getCoreRowModel: getCoreRowModel(), getPaginationRowModel: getPaginationRowModel(),
@@ -371,11 +375,11 @@ export function Auto1({ dane, dania = false }: { dane: Dane; dania?: boolean }) 
       {wTelefonie ? (
         <div ref={poczatekListy} className="flex scroll-mt-16 flex-col gap-3">
           {wiersze.map(({ original: r }) => (
-            <Card key={r.id} className={cn(widziane.has(r.id) && "opacity-60", zaznaczone[r.id] && "ring-2 ring-primary")}>
+            <Card key={r.id} className={cn((widziane.has(r.id) || zakonczona(r)) && "opacity-60", zaznaczone[r.id] && "ring-2 ring-primary")}>
               <CardContent className="flex flex-col gap-2">
                 <div className="flex items-start gap-2">
                   <Checkbox className="mt-1" aria-label={`Zaznacz ${r.id}`} checked={!!zaznaczone[r.id]} onCheckedChange={(v) => tabela.getRow(r.id).toggleSelected(v === true)} />
-                  <div><button className="text-left font-medium" onClick={() => ustawOtwarte(r)}>{r.title || r.id}</button>{r.unroadworthy && <Niezdatne />}{nowe(r) && <Badge variant="secondary" className="ml-1.5">nowe</Badge>}</div>
+                  <div><button className="text-left font-medium" onClick={() => ustawOtwarte(r)}>{r.title || r.id}</button>{r.unroadworthy && <Niezdatne />}{nowe(r) && <Badge variant="secondary" className="ml-1.5">nowe</Badge>}{zakonczona(r) && <Badge variant="outline" className="ml-1.5">zakończona</Badge>}</div>
                 </div>
                 <p className="text-xs text-muted-foreground">{r.dania ? r.id : `${r.id} · ${r._label}`}<br />{[regLabel(r), kmLabel(r), litersLabel(r), hpLabel(r), r._fuel, r._gear].filter((x) => x !== "—").join(" · ")}</p>
                 <div className="grid grid-cols-3 gap-y-2 text-sm">
@@ -411,7 +415,7 @@ export function Auto1({ dane, dania = false }: { dane: Dane; dania?: boolean }) 
               </TableHeader>
               <TableBody>
                 {wiersze.map((w) => (
-                  <TableRow key={w.id} className={cn(widziane.has(w.id) && "opacity-60", w.original.ok && "bg-success/5")} data-state={w.getIsSelected() ? "selected" : undefined}>
+                  <TableRow key={w.id} className={cn((widziane.has(w.id) || zakonczona(w.original)) && "opacity-60", w.original.ok && "bg-success/5")} data-state={w.getIsSelected() ? "selected" : undefined}>
                     {w.getVisibleCells().map((c) => <TableCell key={c.id} className={cn("px-1 tabular-nums", !DO_LEWEJ.has(c.column.id) && "text-center")}>{renderuj(c.column.columnDef.cell, c.getContext())}</TableCell>)}
                   </TableRow>
                 ))}

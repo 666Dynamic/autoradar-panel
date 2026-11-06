@@ -15,7 +15,7 @@ import {
 
 // Nowa podstrona to jeden wpis tutaj i jeden w App.tsx.
 export const STRONY = [
-  { id: "home", tytul: "Home", ikona: <HomeIcon /> },
+  { id: "home", tytul: "Start", ikona: <HomeIcon /> },
   { id: "auto1", tytul: "Auto1", ikona: <CarIcon /> },
   { id: "dania", tytul: "Dania", ikona: <FlagIcon /> },
   { id: "wycena", tytul: "Wycena", ikona: <CalculatorIcon /> },

@@ -13,9 +13,9 @@ export type Ogloszenie = typeof POLA_OGLOSZENIA
 
 // Wzory właściciela. „OFERTA SPROWADZENIA” to osobny rodzaj posta (cena w zł po opłatach), nie styl tamtego.
 export const WZORY: [string, string, string][] = [
-  ["whatsapp", "WhatsApp", "Jak jego wiadomości: flaga i auto, VIN, wersja, paliwo, rejestracja, przebieg, moc, cena"],
-  ["zamowienie", "Facebook – Możliwość sprowadzenia", "Jak jego post o Audi A6 z Danii: auto u kontrahenta, punkty, cena, import od A do Z"],
-  ["oferta", "OFERTA SPROWADZENIA", "Osobny rodzaj posta, jak jego post o Jaguarze E-Pace: dane w jednej linii, cena po opłatach"],
+  ["whatsapp", "WhatsApp", "Krótki: flaga i auto, VIN, wersja, paliwo, rejestracja, przebieg, moc, cena"],
+  ["zamowienie", "Facebook – Możliwość sprowadzenia", "Auto u kontrahenta za granicą: punkty, atuty, cena w €, import od A do Z"],
+  ["oferta", "OFERTA SPROWADZENIA", "Auto do sprowadzenia: dane w jednej linii, wyposażenie, cena w zł po opłatach"],
 ]
 export const wzorZPamieci = (w: string | undefined) => (WZORY.some(([id]) => id === w) ? w! : "whatsapp")
 

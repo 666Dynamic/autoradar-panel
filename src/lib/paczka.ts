@@ -23,12 +23,14 @@ function trescOferty(r: Wiersz, s?: Szczegoly) {
 
 async function lista(auta: Wiersz[], szczegoly: Record<string, Szczegoly>) {
   const { default: zapisz } = await import("write-excel-file/browser")
-  const naglowki = ["Numer", "Auto", "Rocznik", "Pojemność", "Przebieg", "Moc", "Paliwo", "Skrzynia", "Auto1 (EUR)", "Otomoto (EUR)", "Różnica (EUR)", "Ofert", "Typ aukcji", "Link Otomoto", "Link Auto1", "Raport Auto1"]
+  const dania = auta.every((r) => r.dania)
+  const naglowki = ["Numer", "Auto", "Rocznik", "Pojemność", "Przebieg", "Moc", "Paliwo", "Skrzynia", dania ? "Auto Midt (EUR)" : "Auto1 (EUR)", "Otomoto (EUR)", "Różnica (EUR)", "Ofert",
+    dania ? "Typ ceny" : "Typ aukcji", dania ? "VIN" : "Link Otomoto", dania ? "Link Otomoto" : "Link Auto1", dania ? "Folder zdjęć (Dropbox)" : "Raport Auto1"]
   const komorka = (value: string | number | null | undefined) => (typeof value === "number" ? { value: Math.round(value), type: Number } : { value: value ?? "" })
   const wiersze = [
     naglowki.map((value) => ({ value, fontWeight: "bold" as const })),
     ...auta.map((r) => [r.id, r.title, regLabel(r), litersLabel(r), kmLabel(r), hpLabel(r), r._fuel, r._gear,
-      r.a_eur, r.o_eur, r.d_eur, offersLabel(r), r._label, r.search_url, r.auto1_url, szczegoly[r.id]?.report].map(komorka)),
+      r.a_eur, r.o_eur, r.d_eur, offersLabel(r), ...(r.dania ? [r.dania.typCeny, r.dania.vin, r.search_url, r.dania.folder] : [r._label, r.search_url, r.auto1_url, szczegoly[r.id]?.report])].map(komorka)),
   ]
   return zapisz(wiersze as never).toBlob()
 }
@@ -41,7 +43,8 @@ async function pobierzZdjecia(zadania: { url: string; folder: JSZip; plik: strin
     while (nastepne < zadania.length) {
       const z = zadania[nastepne++]
       try {
-        const odpowiedz = await fetch(POSREDNIK + encodeURIComponent(z.url))
+        // Zdjęcia z Danii leżą na naszej stronie (github.io, otwarte dla przeglądarki); pośrednik przepuszcza tylko Auto1.
+        const odpowiedz = await fetch(z.url.startsWith(location.origin) || /\.github\.io\//.test(z.url) ? z.url : POSREDNIK + encodeURIComponent(z.url))
         if (!odpowiedz.ok) throw new Error(String(odpowiedz.status))
         z.folder.file(z.plik, await odpowiedz.blob())
       } catch {
@@ -58,7 +61,7 @@ async function pobierzZdjecia(zadania: { url: string; folder: JSZip; plik: strin
 export async function pobierzPaczke(auta: Wiersz[], postep: (gotowe: number, razem: number) => void) {
   const { default: Zip } = await import("jszip")
   const zip = new Zip()
-  const szczegoly = await wczytajSzczegoly()
+  const szczegoly = auta.some((r) => !r.dania) ? await wczytajSzczegoly() : {} // Dania nie ma szczegoly.json (10 MB)
   const oferty = odczytajOferty()
   const zadania: { url: string; folder: JSZip; plik: string }[] = []
   for (const r of auta) {

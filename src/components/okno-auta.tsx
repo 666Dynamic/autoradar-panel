@@ -12,12 +12,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-import { dodatki, endLabel, noteLabel, kwota, lokalizacja, offersLabel, oplatyAuto1, pieniadze, specyfikacjaAuta, stawkaAkcyzy, tekstFacebook, tekstWhatsApp, wyposazenieOkna, type Waluta, type Wiersz } from "@/lib/auta"
+import { dodatki, endLabel, kolorPL, powodBraku, kwota, lokalizacja, offersLabel, oplatyAuto1, pieniadze, specyfikacjaAuta, stawkaAkcyzy, tekstFacebook, tekstWhatsApp, wyposazenieOkna, type Waluta, type Wiersz } from "@/lib/auta"
 import { MARZA, OPIS_TYPU, doOgloszenia, type AutoDania } from "@/lib/dania"
 import { wczytajSzczegoly, type Szczegoly } from "@/lib/dane"
 import { linkMobile } from "@/lib/mobile"
 import { ogloszenie, zrobOgloszenie } from "@/lib/ogloszenia"
 import { pobierzPaczke, zdjeciaAuta } from "@/lib/paczka"
+import { ostrzezenie } from "@/lib/ostrzezenia"
 import { odczytajOferty, odczytajTransport, zapiszOferte, zapiszTransport } from "@/lib/pamiec"
 import { cn } from "@/lib/utils"
 
@@ -151,7 +152,8 @@ function Lista({ tytul, wiersze }: { tytul: string; wiersze: [string, React.Reac
 }
 
 const druga = (waluta: Waluta): Waluta => (waluta === "eur" ? "pln" : "eur")
-const kolor = (n: number | null) => (n === null ? "" : n >= 0 ? "text-success" : "text-destructive")
+// Zielono tylko auto spełniające próg, jak w tabeli; dodatnia poniżej progu bez koloru, ujemna na czerwono.
+const kolor = (n: number | null, ok: boolean) => (n === null ? "" : ok ? "text-success" : n < 0 ? "text-destructive" : "")
 
 // Jedna z trzech głównych liczb na górze okna: duża w wybranej walucie, pod nią mała w drugiej.
 function Liczba({ tytul, opis, glowna, mala, className }: { tytul: string; opis?: string; glowna: string; mala?: string; className?: string }) {
@@ -171,7 +173,7 @@ function Ceny({ auto, waluta }: { auto: Wiersz; waluta: Waluta }) {
     <div className="grid grid-cols-3 gap-2">
       <Liczba tytul={auto.dania ? "Auto Midt" : "Auto1"} opis={auto.dania?.typCeny ?? undefined} glowna={pieniadze(kwota(auto, "a", waluta), waluta)} mala={pieniadze(kwota(auto, "a", druga(waluta)), druga(waluta))} />
       <Liczba tytul="Otomoto" opis={auto.compared ? `średnia z ${auto.compared}` : undefined} glowna={pieniadze(kwota(auto, "o", waluta), waluta)} mala={pieniadze(kwota(auto, "o", druga(waluta)), druga(waluta))} />
-      <Liczba tytul="Różnica" glowna={plus(d, waluta)} mala={plus(kwota(auto, "d", druga(waluta)) ?? null, druga(waluta))} className={kolor(d)} />
+      <Liczba tytul="Różnica" glowna={plus(d, waluta)} mala={plus(kwota(auto, "d", druga(waluta)) ?? null, druga(waluta))} className={kolor(d, auto.ok)} />
     </div>
   )
 }
@@ -225,7 +227,7 @@ function KosztCalkowity({ auto, s, waluta, kurs }: { auto: Wiersz; s?: Szczegoly
         {wiersz("Otomoto (średnia)", pieniadze(kwota(auto, "o", waluta), waluta))}
         {wiersz("Różnica po kosztach", (
           <span className="flex flex-col items-end">
-            <span className={cn("text-base font-semibold", kolor(roznicaEur))}>{k(roznicaEur)}</span>
+            <span className={cn("text-base font-semibold", roznicaEur === null ? "" : roznicaEur >= 0 ? "text-success" : "text-destructive")}>{k(roznicaEur)}</span>
             {roznicaEur !== null && <span className="text-xs text-muted-foreground">{pieniadze(w(roznicaEur, druga(waluta)), druga(waluta))}</span>}
           </span>
         ), "mt-1 border-t pt-1.5 font-medium [&_dt]:text-foreground")}
@@ -256,7 +258,7 @@ function PostDania({ auto }: { auto: AutoDania }) {
       </Tabs>
       <div className="flex flex-wrap gap-2">
         {/* Zip z Dropboxa (dl=1) pobiera przeglądarka, serwer niczego z Dropboxa nie pobiera. */}
-        {auto.dania.zip && <Button asChild size="sm" className="flex-1"><a href={auto.dania.zip} target="_blank" rel="noopener"><DownloadIcon />Pobierz zdjęcia</a></Button>}
+        {auto.dania.zip && <Button asChild size="sm" className="flex-1"><a href={auto.dania.zip} target="_blank" rel="noopener"><DownloadIcon />Pobierz wszystkie zdjęcia (ZIP)</a></Button>}
       </div>
       <p className="text-xs text-muted-foreground">
         Cena w poście: cena dostawcy + {pieniadze(MARZA, "eur")}.{!auto.dania.folder && " Dostawca nie podał folderu zdjęć."}
@@ -296,23 +298,25 @@ export function OknoAuta({ auto, waluta, kurs, zamknij, widziany }: { auto: Wier
               <div className="flex flex-col gap-2">
                 {zdjeciaAuta(auto).length ? <img src={zdjeciaAuta(auto)[0]} alt={auto.title} className="mx-auto max-h-[38svh] rounded-lg object-contain" />
                   : <p className="text-sm text-muted-foreground">Zdjęcia jeszcze nie ma w panelu: serwer dociąga je co rano partiami. Wszystkie zdjęcia są w Dropboxie.</p>}
-                {dk.dania.folder && <Button asChild variant="outline" size="sm"><a href={dk.dania.folder} target="_blank" rel="noopener"><FolderOpenIcon />Więcej zdjęć (Dropbox)<ExternalLinkIcon /></a></Button>}
+                {dk.dania.folder && <Button asChild variant="outline" size="sm"><a href={dk.dania.folder} target="_blank" rel="noopener"><FolderOpenIcon />Folder zdjęć (Dropbox)<ExternalLinkIcon /></a></Button>}
               </div>
             )
               : szczegoly ? <Zdjecia key={`zdjecia-${auto.id}`} auto={auto} zdjecia={zdjeciaAuta(auto, s)} /> : <p className="text-sm text-muted-foreground">Wczytuję zdjęcia…</p>}
             <div className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
-              <Lista tytul="Auto" wiersze={dk ? [...specyfikacjaAuta(auto), ["Wersja", dk.dania.wersja || "—"], ["Kolor", dk.dania.kolor ?? "—"], ["VIN", dk.dania.vin ?? "—"]]
+              <Lista tytul="Auto" wiersze={dk ? [...specyfikacjaAuta(auto), ["Wersja", dk.dania.wersja || "—"], ["Kolor", kolorPL(dk.dania.kolor) ?? "—"], ["VIN", dk.dania.vin ?? "—"]]
                 : [...specyfikacjaAuta(auto), ...dodatki(s), ["Lokalizacja", lokalizacja(s)]]} />
-              {dk ? <Lista tytul="Dostawca" wiersze={[["Dostawca", "Auto Midt (Dania)"],
+              {dk ? <Lista tytul="Zakup" wiersze={[["Dostawca", "Auto Midt (Dania)"],
                 ["Typ ceny", dk.dania.typCeny ? `${dk.dania.typCeny}, ${OPIS_TYPU[dk.dania.typCeny] ?? ""}`.replace(/, $/, "") : "—"],
                 ...(dk.a_prev_eur != null && dk.a_prev_eur !== dk.a_eur ? [["Poprzednia cena u Auto Midt", pieniadze(waluta === "eur" ? dk.a_prev_eur : dk.a_prev_eur * kurs, waluta)] as [string, string]] : []),
                 ["Próg różnicy", pieniadze(auto.t === null ? null : waluta === "eur" ? auto.t : auto.t * kurs, waluta)],
-                ["Ofert Otomoto", offersLabel(auto)], ...(auto.d_eur === null ? [["Bez porównania", dk.dania.powod ?? noteLabel(auto.note)] as [string, string]] : [])]} />
+                ["Ofert Otomoto", offersLabel(auto)], ...(auto.d_eur === null ? [["Bez porównania", dk.dania.powod ?? powodBraku(auto)] as [string, string]] : []),
+                ...(ostrzezenie(auto) ? [["Uwaga", ostrzezenie(auto) === "1 oferta" ? "średnia z jednej oferty, sprawdź ręcznie" : "skrzynia z domysłu (manual), sprawdź u dostawcy"] as [string, string]] : [])]} />
               : <Lista tytul="Aukcja" wiersze={[["Typ aukcji", auto._label],
                 ...(auto.end_ms != null ? [["Koniec aukcji", endLabel(auto)] as [string, string]] : []),
                 ...(auto._dealer ? [["Licytuj do", pieniadze(kwota(auto, "bid", waluta), waluta)] as [string, string]] : []),
                 ["Próg różnicy", pieniadze(auto.t === null ? null : waluta === "eur" ? auto.t : auto.t * kurs, waluta)],
-                ["Ofert Otomoto", offersLabel(auto)]]} />}
+                ["Ofert Otomoto", offersLabel(auto)], ...(auto.d_eur === null ? [["Bez porównania", powodBraku(auto)] as [string, string]] : []),
+                ...(ostrzezenie(auto) ? [["Uwaga", "średnia z jednej oferty, sprawdź ręcznie"] as [string, string]] : [])]} />}
             </div>
             {dk && <PostDania key={`post-${auto.id}`} auto={dk} />}
             {!dk && <KosztCalkowity key={`koszt-${auto.id}`} auto={auto} s={s} waluta={waluta} kurs={kurs} />}

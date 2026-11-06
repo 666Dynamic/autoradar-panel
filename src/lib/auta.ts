@@ -1,13 +1,17 @@
 import type { Auto, Szczegoly } from "@/lib/dane"
 
-export const FUEL: Record<string, string> = { diesel: "diesel", petrol: "benzyna", hybrid: "hybryda", electro: "elektryczny", gas: "gaz", other: "inne" }
+// Auto1 pisze „electro”, Dania „electric”: oba to samo słowo w panelu.
+export const FUEL: Record<string, string> = { diesel: "diesel", petrol: "benzyna", hybrid: "hybryda", electro: "elektryczny", electric: "elektryczny", gas: "gaz", other: "inne" }
 export const GEAR: Record<string, string> = { manual: "manualna", automatic: "automat", duplex: "automat", "semi-automatic": "automat" }
 // Kod spoza listy (nowy typ w Auto1) widać bez zmiany kodu.
 const AUCTION = new Map([
   ["24D1", "Aukcja 24h"], ["24D2", "Aukcja 24h"], ["24D3", "Aukcja 24h"], ["ZRT24D1", "Aukcja 24h"],
   ["LASTRUN", "Ostatnia szansa"], ["INSTANTPURCHASE", "Zakup natychmiastowy"],
-  ["3RD_PARTY_BIDDING", "Aukcja dealerska"], ["3RD_PARTY_PREBID", "Dealerska zewnętrzna"], ["REMA_PREBIDDING", "Dealerska REMA"],
+  ["3RD_PARTY_BIDDING", "Aukcja dealerska"], ["3RD_PARTY_BIDDING_OPEN", "Aukcja dealerska"], ["3RD_PARTY_PREBID", "Dealerska zewnętrzna"],
+  ["REMA_PREBIDDING", "Dealerska REMA"], ["REMA_BIDDING_OPEN", "Dealerska REMA"],
 ])
+// Nowy kod dealerski, którego jeszcze nie ma na liście: polska nazwa po przedrostku zamiast surowego kodu.
+const etykietaAukcji = (key: string) => AUCTION.get(key) ?? (key.startsWith("3RD_PARTY") ? "Aukcja dealerska" : key.startsWith("REMA") ? "Dealerska REMA" : key)
 export const AUCTION_LABELS = [...new Set(AUCTION.values())]
 
 export type Wiersz = Auto & { _label: string; _fuel: string; _gear: string; _year: number | null; _dealer: boolean; _id: string; _hay: string; _joined: string }
@@ -23,7 +27,7 @@ export function przygotuj(rows: Auto[]): Wiersz[] {
     const w = hay.split(/[^a-z0-9]+/).filter(Boolean)
     return {
       ...r,
-      _label: key === "" ? "nieznany" : AUCTION.get(key) ?? key,
+      _label: key === "" ? "nieznany" : etykietaAukcji(key),
       _fuel: (r.fuel && FUEL[r.fuel]) || r.fuel || "brak danych",
       _gear: (r.gear && GEAR[r.gear]) || r.gear || "brak danych",
       _year: r.reg ? Number(r.reg.slice(0, 4)) : null,
@@ -55,11 +59,17 @@ export const litersLabel = (r: Auto) => (r.liters != null ? r.liters.toFixed(1).
 export const hpLabel = (r: Auto) => (r.hp != null ? r.hp + " KM" : "—")
 export const offersLabel = (r: Auto) => (r.total == null ? "—" : `${r.compared ?? "—"} z ${r.total}`)
 
+// Aukcja albo oferta, której koniec już minął: nie da się jej kupić.
+export const zakonczona = (r: Auto) => r.end_ms != null && r.end_ms < Date.now()
+
 export function endLabel(r: Auto) {
   if (r.end_ms == null) return "—"
   const when = new Date(r.end_ms).toLocaleString("pl-PL", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
   return r.end_ms < Date.now() ? when + " (zakończona)" : when
 }
+
+// Powód braku różnicy dla wiersza: porównanie z 0 ofert to zwykły brak ofert, nie błąd.
+export const powodBraku = (r: Auto) => noteLabel(r.note ?? (r.total === 0 ? "no_exact_offers" : null))
 
 export function noteLabel(n: string | null) {
   if (!n) return "brak pełnego porównania"
@@ -110,7 +120,7 @@ function wartosc(r: Wiersz, key: string, w: Waluta): string | number | null | un
     case "hp": return r.hp
     case "fuel": return r._fuel
     case "gear": return r._gear
-    case "rank": return r.ok ? 2 : r.d_eur === null ? 0 : 1
+    case "rank": return zakonczona(r) ? -1 : r.ok ? 2 : r.d_eur === null ? 0 : 1 // zakończone aukcje na sam koniec
   }
 }
 
@@ -153,17 +163,34 @@ export function wyposazenieOkna(s?: Szczegoly) {
   return s ? WYPOSAZENIE.filter(([k]) => s[k] === true).map(([, nazwa, rzadkie]): [string, boolean] => [nazwa, rzadkie]) : []
 }
 
-const KOLORY: Record<string, string> = { black: "czarny", gray: "szary", grey: "szary", white: "biały", silver: "srebrny", blue: "niebieski", red: "czerwony", green: "zielony", brown: "brązowy", beige: "beżowy", yellow: "żółty", orange: "pomarańczowy", gold: "złoty", purple: "fioletowy" }
+// Jeden słownik kolorów dla Auto1, Danii (też duńskie nazwy) i postów.
+const KOLORY: Record<string, string> = {
+  black: "czarny", gray: "szary", grey: "szary", white: "biały", silver: "srebrny", blue: "niebieski", red: "czerwony", green: "zielony",
+  brown: "brązowy", beige: "beżowy", yellow: "żółty", orange: "pomarańczowy", gold: "złoty", purple: "fioletowy", violet: "fioletowy",
+  other: "inny", champagne: "szampański", bronze: "brązowy", sort: "czarny", hvid: "biały", "grå": "szary", "sølv": "srebrny", "blå": "niebieski", "rød": "czerwony", "grøn": "zielony",
+}
+// Polski kolor; „Grey Metallic” → „szary metalik”. Śmieci od dostawcy (VIN w polu koloru) nie są kolorem.
+export function kolorPL(k?: string | null): string | null {
+  if (!k || /^[A-HJ-NPR-Z0-9]{11,17}$/i.test(k.trim()) && /\d/.test(k)) return null
+  const slowa = k.trim().toLowerCase().split(/\s+/)
+  const metalik = slowa.includes("metallic")
+  const reszta = slowa.filter((s) => s !== "metallic")
+  const nazwa = reszta.length ? reszta.map((s) => KOLORY[s] ?? s).join(" ") : ""
+  return [nazwa, metalik ? "metalik" : ""].filter(Boolean).join(" ") || null
+}
 
 export const dodatki = (s?: Szczegoly): [string, string][] => [
-  ...(typeof s?.colour === "string" ? [["Kolor", KOLORY[s.colour] ?? s.colour] as [string, string]] : []),
+  ...(typeof s?.colour === "string" && kolorPL(s.colour) ? [["Kolor", kolorPL(s.colour)!] as [string, string]] : []),
   ...(s?.doors ? [["Drzwi", String(s.doors)] as [string, string]] : []),
-  ...(typeof s?.emissionStandard === "string" ? [["Norma emisji", s.emissionStandard] as [string, string]] : []),
+  ...(typeof s?.emissionStandard === "string" && !/^n\/?a$/i.test(s.emissionStandard) ? [["Norma emisji", s.emissionStandard] as [string, string]] : []),
 ]
 
 const KRAJE: Record<string, string> = { DE: "Niemcy", NL: "Holandia", BE: "Belgia", FR: "Francja", IT: "Włochy", ES: "Hiszpania", AT: "Austria", PL: "Polska", SE: "Szwecja", DK: "Dania", CZ: "Czechy", PT: "Portugalia", LU: "Luksemburg", CH: "Szwajcaria" }
 
-export const lokalizacja = (s?: Szczegoly) => [s?.city, s?.country && (KRAJE[s.country] ?? s.country)].filter(Boolean).join(", ") || "—"
+export const lokalizacja = (s?: Szczegoly) => {
+  const kraj = s?.country ?? s?.countryCode // auta dealerskie mają tylko countryCode, jak w oplatyAuto1
+  return [s?.city, kraj && (KRAJE[kraj] ?? kraj)].filter(Boolean).join(", ") || "—"
+}
 
 // Stawka akcyzy w procentach (2026): do 2,0 l 3,1%, powyżej 18,6%. Hybryda do 3,5 l połowa, hybryda plug-in do 2,0 l
 // zwolniona do końca 2029, elektryk 0. Plug-in rozpoznawany po tytule. Bez pojemności decyduje wybór w oknie.

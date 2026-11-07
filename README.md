@@ -11,6 +11,17 @@ Dane z nocy czyta z repozytorium `autoradar-migawka` (`https://666dynamic.github
 
 Skaner i noc są w repozytorium `AutoRadar` (`docs/STATE.md`).
 
+## Logowanie i Moje auta (Supabase)
+
+Cały panel jest za jednym wspólnym hasłem (konto `panel@autoradar.app` w projekcie Supabase `autoradar`, Frankfurt, darmowy plan).
+- Hasło ustawia albo zmienia właściciel: `sh skrypty/ustaw-haslo.sh` (wpisuje je w terminalu, nikt inny go nie widzi). Zakładanie nowych kont jest wyłączone.
+- Moje auta: tabele `moje_auta`, `koszty`, `zdjecia` i prywatny schowek `moje-auta` (zdjęcia zmniejszane w przeglądarce do 2000 px). Schemat: `supabase/migrations/`. Bez zalogowania baza nic nie zwraca (RLS).
+- Klucz w `src/lib/supabase.ts` jest publiczny z założenia; klucz serwisowy i hasło bazy nigdy nie trafiają do repo.
+- Darmowy projekt usypia się po 7 dniach bez ruchu: `.github/workflows/supabase-ping.yml` pinguje go codziennie.
+- Kopia na T7: `python3 skrypty/kopia-moje-auta.py <folder>` (wołana przez `tools/kopia-na-t7.sh` w repo AutoRadar).
+- Zmiana schematu: nowy plik w `supabase/migrations/`, potem `npx supabase db push`.
+- Dane nocy (`autoradar-migawka`) są na razie publiczne; przeniesienie ich za hasło to następny krok.
+
 ## Praca
 
 ```bash

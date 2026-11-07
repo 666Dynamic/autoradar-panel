@@ -26,7 +26,7 @@ import { cn } from "@/lib/utils"
 const fmt = new Intl.NumberFormat("pl-PL", { maximumFractionDigits: 0 })
 const kw = (n: number | null | undefined, w: Wal) => (n === null || n === undefined ? "—" : `${fmt.format(n)} ${w === "EUR" ? "€" : "zł"}`)
 const plusKw = (n: number | null, w: Wal) => (n === null ? "—" : `${n > 0 ? "+" : ""}${kw(n, w)}`)
-const kolorZysku = (n: number | null) => (n === null ? "" : n >= 0 ? "text-success" : "text-destructive")
+const kolorZysku = (n: number | null) => (!n ? "" : n > 0 ? "text-success" : "text-destructive")
 // „12 500,50” → 12500.5; puste → null
 const liczba = (s: string) => {
   const t = s.replace(/\s/g, "").replace(",", ".")
@@ -290,7 +290,7 @@ function Teczka({ auto, koszty, zdjecia, adresy, waluta, kurs, zakladka, zamknij
       <div className="grid grid-cols-3 gap-2">
         <Liczba tytul="Koszt całkowity" glowna={kw(r.razem, waluta)} mala={`zakup ${kw(r.zakup, waluta)} + koszty ${kw(r.koszty, waluta)}`} />
         <Liczba tytul="Cena minimalna" glowna={kw(r.minimalna, waluta)} mala={f.min_zysk_kwota ? `z zyskiem ${kw(liczba(f.min_zysk_kwota), f.sprzedaz_waluta)}` : "ustaw minimalny zysk"} />
-        <Liczba tytul={r.zakonczone ? "Zysk" : "Zysk przy cenie wystawienia"} glowna={plusKw(r.zysk, waluta)} mala={r.procent === null ? undefined : `${r.procent.toFixed(1).replace(".", ",")}% ceny`} className={kolorZysku(r.zysk)} />
+        <Liczba tytul="Zysk" glowna={plusKw(r.zysk, waluta)} mala={[r.zakonczone ? "ze sprzedaży" : "przy cenie wystawienia", r.procent === null ? "" : `${r.procent.toFixed(1).replace(".", ",")}%`].filter(Boolean).join(" · ")} className={kolorZysku(r.zysk)} />
       </div>
       <Tabs defaultValue={zakladka} className="min-w-0">
         <TabsList className="w-full overflow-x-auto">

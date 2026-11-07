@@ -1,0 +1,15 @@
+# Darmowy projekt Supabase usypia się po 7 dniach bez ruchu. Codzienne małe zapytanie go budzi.
+# Zapytanie bez logowania: baza nic nie zwraca (reguły RLS), ale liczy się jako ruch.
+name: Ping Supabase
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          KLUCZ=$(grep -o 'sb_publishable_[A-Za-z0-9_-]*' src/lib/supabase.ts)
+          curl -sf "https://dvtnbsztbdpqbeigbgdp.supabase.co/rest/v1/moje_auta?select=id&limit=1" -H "apikey: $KLUCZ" -o /dev/null

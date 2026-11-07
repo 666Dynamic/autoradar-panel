@@ -1,3 +1,4 @@
+import { pobierzJson } from "@/lib/schowek"
 export type Auto = {
   id: string
   title: string
@@ -95,21 +96,23 @@ export type Dane = {
   rows: Auto[]
 }
 
-// Nocny skan publikuje dane obok obecnej strony.
-const ADRES = import.meta.env.VITE_DANE ?? "https://666dynamic.github.io/autoradar-migawka/data.json"
+// Dane nocy: prywatny schowek Supabase (po zalogowaniu). VITE_DANE = lokalna kopia do testów (public/test-dane).
+const LOKALNIE = import.meta.env.VITE_DANE || ""
 
-export async function wczytajDane(): Promise<Dane> {
-  const odpowiedz = await fetch(ADRES, { cache: "no-cache" })
+async function plikLokalny<T>(nazwa: string): Promise<T> {
+  const odpowiedz = await fetch(LOKALNIE.replace("data.json", nazwa), { cache: "no-cache" })
   if (!odpowiedz.ok) throw new Error(String(odpowiedz.status))
   return odpowiedz.json()
 }
+export const plikNocy = <T,>(nazwa: string): Promise<T> => (LOKALNIE ? plikLokalny<T>(nazwa) : pobierzJson<T>(nazwa))
 
-const ADRES_SZCZEGOLOW = ADRES.replace("data.json", "szczegoly.json")
+export const wczytajDane = () => plikNocy<Dane>("data.json")
+
 let szczegoly: Promise<Record<string, Szczegoly>> | null = null
 
 // Bez pliku (noc sprzed zmiany, błąd sieci) auto ma tylko pierwsze zdjęcie z głównych danych; następne otwarcie próbuje znowu.
 export function wczytajSzczegoly() {
-  szczegoly ??= fetch(ADRES_SZCZEGOLOW, { cache: "no-cache" }).then((o) => (o.ok ? o.json() : Promise.reject(o.status))).catch(() => {
+  szczegoly ??= plikNocy<Record<string, Szczegoly>>("szczegoly.json").catch(() => {
     szczegoly = null
     return {}
   })

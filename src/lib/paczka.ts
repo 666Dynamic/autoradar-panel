@@ -37,7 +37,7 @@ async function lista(auta: Wiersz[], szczegoly: Record<string, Szczegoly>) {
 
 // Zdjęcia z Danii leżą na naszej stronie (github.io, otwarte dla przeglądarki); pośrednik przepuszcza tylko Auto1.
 export async function pobierzZdjecie(url: string): Promise<Blob> {
-  const odpowiedz = await fetch(url.startsWith(location.origin) || /\.github\.io\//.test(url) ? url : POSREDNIK + encodeURIComponent(url))
+  const odpowiedz = await fetch(url.startsWith(location.origin) || /\.github\.io\/|\.supabase\.co\//.test(url) ? url : POSREDNIK + encodeURIComponent(url))
   if (!odpowiedz.ok) throw new Error(String(odpowiedz.status))
   return odpowiedz.blob()
 }

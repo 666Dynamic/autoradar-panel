@@ -35,6 +35,13 @@ async function lista(auta: Wiersz[], szczegoly: Record<string, Szczegoly>) {
   return zapisz(wiersze as never).toBlob()
 }
 
+// Zdjęcia z Danii leżą na naszej stronie (github.io, otwarte dla przeglądarki); pośrednik przepuszcza tylko Auto1.
+export async function pobierzZdjecie(url: string): Promise<Blob> {
+  const odpowiedz = await fetch(url.startsWith(location.origin) || /\.github\.io\//.test(url) ? url : POSREDNIK + encodeURIComponent(url))
+  if (!odpowiedz.ok) throw new Error(String(odpowiedz.status))
+  return odpowiedz.blob()
+}
+
 async function pobierzZdjecia(zadania: { url: string; folder: JSZip; plik: string }[], postep: (gotowe: number) => void) {
   let nastepne = 0
   let gotowe = 0
@@ -43,10 +50,7 @@ async function pobierzZdjecia(zadania: { url: string; folder: JSZip; plik: strin
     while (nastepne < zadania.length) {
       const z = zadania[nastepne++]
       try {
-        // Zdjęcia z Danii leżą na naszej stronie (github.io, otwarte dla przeglądarki); pośrednik przepuszcza tylko Auto1.
-        const odpowiedz = await fetch(z.url.startsWith(location.origin) || /\.github\.io\//.test(z.url) ? z.url : POSREDNIK + encodeURIComponent(z.url))
-        if (!odpowiedz.ok) throw new Error(String(odpowiedz.status))
-        z.folder.file(z.plik, await odpowiedz.blob())
+        z.folder.file(z.plik, await pobierzZdjecie(z.url))
       } catch {
         bledy++
       }

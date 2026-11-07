@@ -57,7 +57,7 @@ export function App() {
     return () => document.removeEventListener("visibilitychange", odswiez)
   }, [potrzebneDane])
 
-  const wymagaDanych = strona !== "wycena" && strona !== "moje-auta" && strona !== "ogloszenia" && strona !== "dania"
+  const wymagaDanych = strona !== "wycena" && strona !== "ogloszenia" && strona !== "dania"
   return (
     <SidebarProvider style={{ "--sidebar-width": "calc(var(--spacing) * 56)", "--header-height": "calc(var(--spacing) * 12)" } as React.CSSProperties}>
       <AppSidebar strona={strona} variant="inset" />
@@ -71,8 +71,8 @@ export function App() {
           {/* Auto1 i Wycena zostają w pamięci, żeby filtry i wpisane dane przetrwały przejście między stronami. */}
           {dane && odwiedzone.has("auto1") && <div className={strona === "auto1" ? "flex min-w-0 flex-1 flex-col gap-4" : "hidden"}><Auto1 dane={dane} /></div>}
           {odwiedzone.has("wycena") && <div className={strona === "wycena" ? "contents" : "hidden"}><Wycena /></div>}
-          {/* Moje auta działają bez nocnych danych; z danymi numer Auto1 dostaje link. */}
-          {strona === "moje-auta" && <MojeAuta dane={dane} />}
+          {/* Moje auta z bazy (Supabase); z nocnych danych biorą tylko kurs EUR/PLN. */}
+          {strona === "moje-auta" && dane && <MojeAuta dane={dane} />}
           {/* Ogłoszenia też bez nocnych danych; z danymi można wczytać auto po numerze. */}
           {strona === "ogloszenia" && <Ogloszenia dane={dane} />}
           {/* Dania: lista Auto Midt z porannego kroku (dania.json) w tabeli Auto1; zostaje w pamięci jak Auto1. */}

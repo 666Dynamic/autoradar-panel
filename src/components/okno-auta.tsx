@@ -1,5 +1,5 @@
 import * as React from "react"
-import { CheckIcon, CopyIcon, DownloadIcon, ExternalLinkIcon, FolderOpenIcon, MegaphoneIcon } from "lucide-react"
+import { CheckIcon, CopyIcon, DownloadIcon, ExternalLinkIcon, FolderOpenIcon, MegaphoneIcon, ShoppingCartIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
@@ -16,6 +16,7 @@ import { dodatki, endLabel, kolorPL, powodBraku, kwota, lokalizacja, offersLabel
 import { MARZA, OPIS_TYPU, doOgloszenia, type AutoDania } from "@/lib/dania"
 import { wczytajSzczegoly, type Szczegoly } from "@/lib/dane"
 import { linkMobile } from "@/lib/mobile"
+import { kupilem, otworzWMoichAutach } from "@/lib/moje-auta"
 import { ogloszenie, zrobOgloszenie } from "@/lib/ogloszenia"
 import { pobierzPaczke, zdjeciaAuta } from "@/lib/paczka"
 import { ostrzezenie } from "@/lib/ostrzezenia"
@@ -267,6 +268,28 @@ function PostDania({ auto }: { auto: AutoDania }) {
   )
 }
 
+// „Kupiłem”: teczka w Moich autach z danymi i zdjęciami tego auta. Drugie kliknięcie potwierdza.
+function Kupilem({ auto, s, zamknij }: { auto: Wiersz; s?: Szczegoly; zamknij: () => void }) {
+  const [krok, ustawKrok] = React.useState<"start" | "pewne" | string>("start")
+  const czeka = krok !== "start" && krok !== "pewne"
+  return (
+    <Button size="sm" variant={krok === "pewne" ? "default" : "outline"} className="flex-1" disabled={czeka} onClick={async () => {
+      if (krok === "start") return ustawKrok("pewne")
+      ustawKrok("Zakładam teczkę…")
+      try {
+        const { id, bledy } = await kupilem(auto, s, (g, r) => ustawKrok(`Kopiuję zdjęcia ${g + 1}/${r}…`))
+        if (bledy) toast.error(`Nie udało się skopiować ${bledy} zdjęć. Resztę dodasz w teczce.`)
+        else toast.success("Auto jest w Moich autach.")
+        zamknij()
+        otworzWMoichAutach(id)
+      } catch {
+        toast.error("Nie udało się założyć teczki.")
+        ustawKrok("start")
+      }
+    }}><ShoppingCartIcon />{krok === "start" ? "Kupiłem" : krok === "pewne" ? "Na pewno? Dodaj do Moich aut" : krok}</Button>
+  )
+}
+
 export function OknoAuta({ auto, waluta, kurs, zamknij, widziany }: { auto: Wiersz | null; waluta: Waluta; kurs: number; zamknij: () => void; widziany: (id: string) => void }) {
   const [szczegoly, ustaw] = React.useState<Record<string, Szczegoly> | null>(null)
   React.useEffect(() => {
@@ -291,6 +314,7 @@ export function OknoAuta({ auto, waluta, kurs, zamknij, widziany }: { auto: Wier
               {mobile && <Button asChild variant="outline" size="sm" className="flex-1"><a href={mobile} target="_blank" rel="noopener">mobile.de<ExternalLinkIcon /></a></Button>}
               {s?.report && <Button asChild variant="outline" size="sm" className="flex-1"><a href={s.report} target="_blank" rel="noopener">Raport<ExternalLinkIcon /></a></Button>}
               {!dk && <Button size="sm" className="flex-1" onClick={() => { zamknij(); zrobOgloszenie(auto.id) }}><MegaphoneIcon />Zrób ogłoszenie</Button>}
+              <Kupilem key={auto.id} auto={auto} s={s} zamknij={zamknij} />
             </div>
             <Ceny auto={auto} waluta={waluta} />
             {dk ? (

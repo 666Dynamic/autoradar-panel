@@ -8,10 +8,10 @@ EMAIL="panel@autoradar.app"   # stały adres konta panelu, nikt go nie wpisuje
 
 KLUCZ=$(npx -y supabase@latest projects api-keys --project-ref "$REF" -o json 2>/dev/null | python3 -c "import json,sys; print(next(k['api_key'] for k in json.load(sys.stdin) if k.get('name')=='service_role'))")
 
-printf "Nowe hasło do panelu (min. 8 znaków): "; stty -echo; read -r H1; stty echo; echo
+printf "Nowe hasło do panelu (min. 6 znaków): "; stty -echo; read -r H1; stty echo; echo
 printf "Powtórz hasło: "; stty -echo; read -r H2; stty echo; echo
 [ "$H1" = "$H2" ] || { echo "Hasła się różnią. Nic nie zmieniono."; exit 1; }
-[ ${#H1} -ge 8 ] || { echo "Za krótkie. Nic nie zmieniono."; exit 1; }
+[ ${#H1} -ge 6 ] || { echo "Za krótkie. Nic nie zmieniono."; exit 1; }
 
 ID=$(curl -s "$URL/auth/v1/admin/users?per_page=50" -H "apikey: $KLUCZ" -H "Authorization: Bearer $KLUCZ" | python3 -c "import json,sys; print(next((u['id'] for u in json.load(sys.stdin).get('users',[]) if u.get('email')=='$EMAIL'),''))")
 

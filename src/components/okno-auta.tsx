@@ -16,7 +16,7 @@ import { dodatki, endLabel, kolorPL, powodBraku, kwota, lokalizacja, offersLabel
 import { MARZA, OPIS_TYPU, doOgloszenia, type AutoDania } from "@/lib/dania"
 import { wczytajSzczegoly, type Szczegoly } from "@/lib/dane"
 import { linkMobile } from "@/lib/mobile"
-import { kupilem, otworzWMoichAutach } from "@/lib/moje-auta"
+import { kupilem, kupilemIOtworz } from "@/lib/moje-auta"
 import { ogloszenie, zrobOgloszenie } from "@/lib/ogloszenia"
 import { pobierzPaczke, zdjeciaAuta } from "@/lib/paczka"
 import { ostrzezenie } from "@/lib/ostrzezenia"
@@ -268,25 +268,22 @@ function PostDania({ auto }: { auto: AutoDania }) {
   )
 }
 
-// „Kupiłem”: teczka w Moich autach z danymi i zdjęciami tego auta. Drugie kliknięcie potwierdza.
+// „Kupiłem”: teczka w Moich autach z danymi tego auta; zdjęcia kopiują się tam w tle. Drugie kliknięcie potwierdza.
 function Kupilem({ auto, s, zamknij }: { auto: Wiersz; s?: Szczegoly; zamknij: () => void }) {
-  const [krok, ustawKrok] = React.useState<"start" | "pewne" | string>("start")
-  const czeka = krok !== "start" && krok !== "pewne"
+  const [krok, ustawKrok] = React.useState<"start" | "pewne" | "czekam">("start")
   return (
-    <Button size="sm" variant={krok === "pewne" ? "default" : "outline"} className="flex-1" disabled={czeka} onClick={async () => {
+    <Button size="sm" variant={krok === "pewne" ? "default" : "outline"} className="flex-1" disabled={krok === "czekam"} onClick={async () => {
       if (krok === "start") return ustawKrok("pewne")
-      ustawKrok("Zakładam teczkę…")
+      ustawKrok("czekam")
       try {
-        const { id, bledy } = await kupilem(auto, s, (g, r) => ustawKrok(`Kopiuję zdjęcia ${g + 1}/${r}…`))
-        if (bledy) toast.error(`Nie udało się skopiować ${bledy} zdjęć. Resztę dodasz w teczce.`)
-        else toast.success("Auto jest w Moich autach.")
+        const { auto: nowe, adresy } = await kupilem(auto, s)
         zamknij()
-        otworzWMoichAutach(id)
+        kupilemIOtworz(nowe, adresy)
       } catch {
-        toast.error("Nie udało się założyć teczki.")
+        toast.error("Nie udało się dodać auta.")
         ustawKrok("start")
       }
-    }}><ShoppingCartIcon />{krok === "start" ? "Kupiłem" : krok === "pewne" ? "Na pewno? Dodaj do Moich aut" : krok}</Button>
+    }}><ShoppingCartIcon />{krok === "start" ? "Kupiłem" : krok === "pewne" ? "Na pewno? Dodaj do Moich aut" : "Dodaję…"}</Button>
   )
 }
 

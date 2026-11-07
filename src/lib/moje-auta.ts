@@ -2,7 +2,7 @@
 // Dostęp tylko po zalogowaniu do panelu. Rachunki są czystymi funkcjami (testy w __testy__).
 import type { Wiersz } from "@/lib/auta"
 import type { Szczegoly } from "@/lib/dane"
-import { pobierzZdjecie, zdjeciaAuta } from "@/lib/paczka"
+import { zdjeciaAuta } from "@/lib/paczka"
 import { supabase } from "@/lib/supabase"
 
 export type Wal = "EUR" | "PLN"
@@ -69,7 +69,14 @@ export type MojeAuto = {
 export type NoweAuto = Partial<Omit<MojeAuto, "id" | "utworzono" | "zmieniono">> & { nazwa: string }
 
 export type Koszt = { id: string; auto_id: string; kategoria: Kategoria; opis: string; kwota: number; waluta: Wal; data: string | null }
-export type Zdjecie = { id: string; auto_id: string; sciezka: string; szkoda: boolean; opis: string; kolejnosc: number; url?: string }
+// Zdjęcia w trzech grupach; PDF (umowa, faktura) trafia do „Moje”.
+export const RODZAJE = [
+  ["sprzedawca", "Od sprzedawcy"],
+  ["moje", "Moje"],
+  ["szkoda", "Szkody"],
+] as const
+export type Rodzaj = (typeof RODZAJE)[number][0]
+export type Zdjecie = { id: string; auto_id: string; sciezka: string; rodzaj: Rodzaj; opis: string; kolejnosc: number }
 
 // ---------- Rachunki (bez sieci) ----------
 
@@ -83,36 +90,58 @@ export function przelicz(kwota: number | null | undefined, z: Wal, na: Wal, kurs
 export type Rachunek = {
   zakup: number | null
   koszty: number
-  razem: number | null // koszt całkowity = zakup + koszty
-  minimalna: number | null // cena minimalna = koszt całkowity + minimalny zysk
-  wystawienie: number | null
-  sprzedaz: number | null
-  zysk: number | null // sprzedaż (albo cena wystawienia, gdy nie sprzedane) − koszt całkowity
-  procent: number | null // zysk jako % ceny sprzedaży
-  zakonczone: boolean // zysk liczony z prawdziwej sprzedaży
+  razem: number | null // zakup + koszty
+  cena: number | null // cena sprzedaży, a przed sprzedażą cena wystawienia
+  zysk: number | null // cena − razem
+  zakonczone: boolean // zysk z prawdziwej sprzedaży
 }
 
 export function rachunek(a: MojeAuto, koszty: Koszt[], kurs: number, na: Wal): Rachunek {
   const zakup = przelicz(a.zakup_kwota, a.zakup_waluta, na, kurs)
   const sumaKosztow = koszty.reduce((s, k) => s + (przelicz(k.kwota, k.waluta, na, kurs) ?? 0), 0)
   const razem = zakup === null ? null : zakup + sumaKosztow
-  const minZysk = przelicz(a.min_zysk_kwota, a.sprzedaz_waluta, na, kurs)
-  const minimalna = razem === null ? null : razem + (minZysk ?? 0)
-  const wystawienie = przelicz(a.wystawienie_kwota, a.sprzedaz_waluta, na, kurs)
   const sprzedaz = przelicz(a.sprzedaz_kwota, a.sprzedaz_waluta, na, kurs)
-  const cena = sprzedaz ?? wystawienie
+  const cena = sprzedaz ?? przelicz(a.wystawienie_kwota, a.sprzedaz_waluta, na, kurs)
   const zysk = razem === null || cena === null ? null : cena - razem
-  const procent = zysk === null || !cena ? null : (zysk / cena) * 100
-  return { zakup, koszty: sumaKosztow, razem, minimalna, wystawienie, sprzedaz, zysk, procent, zakonczone: sprzedaz !== null }
+  return { zakup, koszty: sumaKosztow, razem, cena, zysk, zakonczone: sprzedaz !== null }
 }
 
-// Kolor oferty klienta: czerwona poniżej ceny minimalnej, pomarańczowa między minimalną a ceną wystawienia
-// (do negocjacji), zielona od ceny wystawienia w górę.
-export function kolorOferty(oferta: number | null, minimalna: number | null, wystawienie: number | null): "zielona" | "pomaranczowa" | "czerwona" | null {
-  if (oferta === null || minimalna === null) return null
-  if (oferta < minimalna) return "czerwona"
-  if (wystawienie !== null && oferta >= wystawienie) return "zielona"
-  return wystawienie === null ? "zielona" : "pomaranczowa"
+// Przesunięcie zdjęcia z miejsca `z` na `na` w jego grupie: nowe numery tylko dla zdjęć, które zmieniły miejsce.
+export function przesun(lista: Zdjecie[], z: number, na: number): { id: string; kolejnosc: number }[] {
+  if (z === na || z < 0 || na < 0 || z >= lista.length || na >= lista.length) return []
+  const nowa = [...lista]
+  const [ruszone] = nowa.splice(z, 1)
+  nowa.splice(na, 0, ruszone)
+  return nowa.flatMap((x, i) => (x.kolejnosc === i ? [] : [{ id: x.id, kolejnosc: i }]))
+}
+export const poKolei = (a: Zdjecie, b: Zdjecie) => a.kolejnosc - b.kolejnosc || a.sciezka.localeCompare(b.sciezka)
+
+// Daty po polsku: „07.11.2026” ⇄ „2026-11-07”. Puste albo błędne → null.
+export const naPolska = (iso: string | null) => (iso ? iso.split("-").reverse().join(".") : "")
+export function zPolskiej(tekst: string): string | null {
+  const m = tekst.trim().match(/^(\d{1,2})[.\-/ ](\d{1,2})[.\-/ ](\d{2}|\d{4})$/)
+  if (!m) return null
+  const rok = m[3].length === 2 ? 2000 + Number(m[3]) : Number(m[3])
+  const d = new Date(Date.UTC(rok, Number(m[2]) - 1, Number(m[1])))
+  if (d.getUTCDate() !== Number(m[1]) || d.getUTCMonth() !== Number(m[2]) - 1) return null
+  return d.toISOString().slice(0, 10)
+}
+
+// Zapamiętana waluta (widoku albo nowych kwot), osobno dla każdej przeglądarki.
+export function pamietanaWaluta(klucz: string, domyslna: Wal): Wal {
+  try {
+    const w = localStorage.getItem(klucz)
+    return w === "EUR" || w === "PLN" ? w : domyslna
+  } catch {
+    return domyslna
+  }
+}
+export function zapamietajWalute(klucz: string, w: Wal) {
+  try {
+    localStorage.setItem(klucz, w)
+  } catch {
+    // zostanie do odświeżenia strony
+  }
 }
 
 export const dniOd = (od: string | null, do_: string | null = null) =>
@@ -250,12 +279,23 @@ export function otworzWMoichAutach(id: string) {
   window.location.hash = "#/moje-auta"
 }
 
-// Zakłada teczkę z danymi z okna auta i kopiuje jego zdjęcia do naszego schowka
-// (linki Auto1 mogą wygasnąć po aukcji, a kupione auto ma mieć zdjęcia na zawsze).
-export async function kupilem(r: Wiersz, s: Szczegoly | undefined, postep: (gotowe: number, razem: number) => void): Promise<{ id: string; bledy: number }> {
-  const a = await dodajAuto({
+const KLUCZ_ZDJECIA = "ar_moje_auta_zdjecia"
+// Zdjęcia do skopiowania po „Kupiłem”: strona Moje auta kopiuje je w tle (z możliwością zatrzymania).
+export function oczekujaceZdjecia(id: string): string[] {
+  try {
+    const z = JSON.parse(sessionStorage.getItem(KLUCZ_ZDJECIA) ?? "{}")
+    sessionStorage.removeItem(KLUCZ_ZDJECIA)
+    return z.id === id && Array.isArray(z.adresy) ? z.adresy : []
+  } catch {
+    return []
+  }
+}
+
+// Zakłada teczkę z danymi auta z listy; zdjęcia (linki Auto1 wygasają po aukcji) kopiuje potem strona Moje auta.
+export async function kupilem(r: Wiersz, s: Szczegoly | undefined, zmiany: Partial<MojeAuto> = {}): Promise<{ auto: MojeAuto; adresy: string[] }> {
+  const auto = await dodajAuto({
     nazwa: r.title || r.id,
-    rok: r._year,
+    rok: r._year ?? null,
     vin: r.dania?.vin ?? null,
     przebieg_km: r.km,
     zrodlo: r.dania ? "dania" : "auto1",
@@ -265,16 +305,15 @@ export async function kupilem(r: Wiersz, s: Szczegoly | undefined, postep: (goto
     zakup_waluta: "EUR",
     zakup_data: dzis(),
     status: "kupione",
+    ...zmiany,
   })
-  const adresy = zdjeciaAuta(r, s).slice(0, 40)
-  let bledy = 0
-  for (const [i, url] of adresy.entries()) {
-    postep(i, adresy.length)
-    try {
-      await wgraj(a.id, await pobierzZdjecie(url), { kolejnosc: i })
-    } catch {
-      bledy++
-    }
+  return { auto, adresy: zdjeciaAuta(r, s).slice(0, 40) }
+}
+export function kupilemIOtworz(auto: MojeAuto, adresy: string[]) {
+  try {
+    sessionStorage.setItem(KLUCZ_ZDJECIA, JSON.stringify({ id: auto.id, adresy }))
+  } catch {
+    // bez zdjęć; dodasz je w teczce
   }
-  return { id: a.id, bledy }
+  otworzWMoichAutach(auto.id)
 }

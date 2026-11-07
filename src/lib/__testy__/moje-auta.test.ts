@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { kolorOferty, przelicz, rachunek, type Koszt, type MojeAuto } from "@/lib/moje-auta"
+import { przelicz, przesun, rachunek, zPolskiej, type Koszt, type MojeAuto, type Zdjecie } from "@/lib/moje-auta"
 
 const auto = (z: Partial<MojeAuto> = {}): MojeAuto => ({
   id: "a", utworzono: "", zmieniono: "", status: "kupione", nazwa: "Audi", rok: 2019, vin: null, przebieg_km: null,
@@ -22,14 +22,13 @@ describe("Moje auta: rachunki", () => {
     expect(r.razem).toBeCloseTo(10700)
   })
 
-  it("cena minimalna = koszt całkowity + minimalny zysk; zysk i procent od ceny sprzedaży", () => {
-    const a = auto({ min_zysk_kwota: 4300, wystawienie_kwota: 55900 })
-    const r = rachunek(a, [], 4.3, "PLN")
+  it("zysk przy cenie wystawienia, w walucie widoku", () => {
+    const r = rachunek(auto({ wystawienie_kwota: 55900 }), [], 4.3, "PLN")
     expect(r.razem).toBeCloseTo(43000)
-    expect(r.minimalna).toBeCloseTo(47300)
+    expect(r.cena).toBeCloseTo(55900)
     expect(r.zysk).toBeCloseTo(12900)
-    expect(r.procent).toBeCloseTo((12900 / 55900) * 100)
     expect(r.zakonczone).toBe(false)
+    expect(rachunek(auto({ wystawienie_kwota: 55900 }), [], 4.3, "EUR").zysk).toBeCloseTo(3000)
   })
 
   it("po sprzedaży zysk liczy się z ceny sprzedaży, nie wystawienia", () => {
@@ -44,11 +43,20 @@ describe("Moje auta: rachunki", () => {
     expect(r.zysk).toBeNull()
   })
 
-  it("kolor oferty klienta", () => {
-    expect(kolorOferty(46000, 47300, 55900)).toBe("czerwona")
-    expect(kolorOferty(50000, 47300, 55900)).toBe("pomaranczowa")
-    expect(kolorOferty(55900, 47300, 55900)).toBe("zielona")
-    expect(kolorOferty(48000, 47300, null)).toBe("zielona")
-    expect(kolorOferty(null, 47300, 55900)).toBeNull()
+  it("przesuwanie zdjęć zmienia numery tylko tych, które ruszyły", () => {
+    const z = (id: string, kolejnosc: number): Zdjecie => ({ id, auto_id: "a", sciezka: id, rodzaj: "moje", opis: "", kolejnosc })
+    const lista = [z("a", 0), z("b", 1), z("c", 2), z("d", 3)]
+    expect(przesun(lista, 2, 0)).toEqual([{ id: "c", kolejnosc: 0 }, { id: "a", kolejnosc: 1 }, { id: "b", kolejnosc: 2 }])
+    expect(przesun(lista, 1, 2)).toEqual([{ id: "c", kolejnosc: 1 }, { id: "b", kolejnosc: 2 }])
+    expect(przesun(lista, 0, 0)).toEqual([])
+    expect(przesun(lista, 3, 4)).toEqual([])
+  })
+
+  it("daty po polsku", () => {
+    expect(zPolskiej("07.11.2026")).toBe("2026-11-07")
+    expect(zPolskiej("7.1.26")).toBe("2026-01-07")
+    expect(zPolskiej("31.02.2026")).toBeNull()
+    expect(zPolskiej("11/07/2026")).toBe("2026-07-11")
+    expect(zPolskiej("jutro")).toBeNull()
   })
 })

@@ -63,3 +63,15 @@ Dania używa tej samej tabeli i okna co Auto1 (`src/pages/auto1.tsx`, `src/compo
 | `src/lib/ostrzezenia.ts` | „1 oferta”, „skrzynia?” |
 | `src/lib/paczka.ts` | ZIP ze zdjęciami i Excel |
 | `src/lib/ogloszenia.ts` | wzory postów |
+
+### Moje auta: jak działa okno auta (od 07.11 wieczorem)
+- **Dodaj auto:** jeden krok. Wybierasz z listy Auto1 / Dania (dane i zdjęcia przechodzą same) albo wpisujesz sam. Daty w formacie dd.mm.rrrr.
+- **Okno jak w Auto1:** kafelki Koszt / Wystawione (Sprzedane) / Zysk, galeria i dane. Każde pole zapisuje się samo po wyjściu z niego; nie ma przycisku „Zapisz”.
+- **Zdjęcia w trzech grupach:** Od sprzedawcy, Moje (też PDF), Szkody.
+  - Każda grupa ma swój przycisk „Dodaj”.
+  - Wgrywanie idzie w tle, po 3 pliki naraz, i ma przycisk „Zatrzymaj”.
+  - Kolejność: strzałki i „Na początek”.
+  - Zaznaczone zdjęcia: pobierz, usuń albo przenieś do innej grupy.
+  - Pełny ekran działa w panelu, zdjęcia przełączają strzałki.
+- **Waluta:** przełącznik EUR/PLN liczy wszystkie sumy i zysk i jest zapamiętany. Waluta nowego kosztu i sprzedaży też jest zapamiętana.
+- **Cena sprzedaży:** wpisana oznacza auto jako sprzedane.

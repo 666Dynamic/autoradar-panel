@@ -15,12 +15,12 @@ Skaner i noc są w repozytorium `AutoRadar` (`docs/STATE.md`).
 
 Cały panel jest za jednym wspólnym hasłem (konto `panel@autoradar.app` w projekcie Supabase `autoradar`, Frankfurt, darmowy plan).
 - Hasło ustawia albo zmienia właściciel: `sh skrypty/ustaw-haslo.sh` (wpisuje je w terminalu, nikt inny go nie widzi). Zakładanie nowych kont jest wyłączone.
-- Moje auta: tabele `moje_auta`, `koszty`, `zdjecia` i prywatny schowek `moje-auta` (zdjęcia zmniejszane w przeglądarce do 2000 px). Schemat: `supabase/migrations/`. Bez zalogowania baza nic nie zwraca (RLS).
+- Moje auta: tabele `moje_auta` (z szkodami i transportem), `zdjecia` (oraz stara `koszty` tylko do odczytu historii) i prywatny schowek `moje-auta` (zdjęcia zmniejszane w przeglądarce do 2000 px). Schemat: `supabase/migrations/`. Bez zalogowania baza nic nie zwraca (RLS).
 - Klucz w `src/lib/supabase.ts` jest publiczny z założenia; klucz serwisowy i hasło bazy nigdy nie trafiają do repo.
+- Dane nocy (`autoradar-migawka`) są na razie publiczne; przeniesienie ich za hasło to następny krok.
 - Darmowy projekt usypia się po 7 dniach bez ruchu: `.github/workflows/supabase-ping.yml` pinguje go codziennie.
 - Kopia na T7: `python3 skrypty/kopia-moje-auta.py <folder>` (wołana przez `tools/kopia-na-t7.sh` w repo AutoRadar).
 - Zmiana schematu: nowy plik w `supabase/migrations/`, potem `npx supabase db push`.
-- Dane nocy (`autoradar-migawka`) są na razie publiczne; przeniesienie ich za hasło to następny krok.
 
 ## Praca
 
@@ -64,14 +64,16 @@ Dania używa tej samej tabeli i okna co Auto1 (`src/pages/auto1.tsx`, `src/compo
 | `src/lib/paczka.ts` | ZIP ze zdjęciami i Excel |
 | `src/lib/ogloszenia.ts` | wzory postów |
 
-### Moje auta: jak działa okno auta (od 07.11 wieczorem)
-- **Dodaj auto:** jeden krok. Wybierasz z listy Auto1 / Dania (dane i zdjęcia przechodzą same) albo wpisujesz sam. Daty w formacie dd.mm.rrrr.
-- **Okno jak w Auto1:** kafelki Koszt / Wystawione (Sprzedane) / Zysk, galeria i dane. Każde pole zapisuje się samo po wyjściu z niego; nie ma przycisku „Zapisz”.
-- **Zdjęcia w trzech grupach:** Od sprzedawcy, Moje (też PDF), Szkody.
-  - Każda grupa ma swój przycisk „Dodaj”.
-  - Wgrywanie idzie w tle, po 3 pliki naraz, i ma przycisk „Zatrzymaj”.
-  - Kolejność: strzałki i „Na początek”.
-  - Zaznaczone zdjęcia: pobierz, usuń albo przenieś do innej grupy.
-  - Pełny ekran działa w panelu, zdjęcia przełączają strzałki.
-- **Waluta:** przełącznik EUR/PLN liczy wszystkie sumy i zysk i jest zapamiętany. Waluta nowego kosztu i sprzedaży też jest zapamiętana.
-- **Cena sprzedaży:** wpisana oznacza auto jako sprzedane.
+### Moje auta: jak działa okno auta (od 10.11, makieta zatwierdzona przez właściciela)
+Plik `src/components/okno-mojego-auta.tsx`. Jedno okno na „Dodaj auto” i na edycję, w trzech krokach. „Zapisz” jest na każdym kroku; zamknięcie z niezapisanymi zmianami pyta „Zapisać zmiany?”.
+- **1. Dane:**
+  - Skąd auto: Auto1 / Inna aukcja / Handlarz / komis / Prywatnie / Inne. Przy Auto1 pole „Numer Auto1” wypełnia dane z nocnego skanu.
+  - VIN rozpoznawany za darmo, bez serwisów (`src/lib/vin.ts`): marka zawsze, model i rocznik dla grupy VW, model dla Mercedesa. Gdy kod pasuje do dwóch modeli, są przyciski wyboru.
+  - Marka i model z listy z wyszukiwaniem (`src/lib/marki.ts`), reszta z list. Moc i przebieg wpisuje się cyframi, kropki dochodzą same.
+  - Daty: wpis „8.11” albo kalendarz z wyborem miesiąca i roku.
+  - Ceny w jednej walucie auta (przełącznik €/zł), z groszami: zakup, transport, razem, Rynek (średnia najtańszych ofert ze skanu i link do Otomoto), cena, za którą chcę sprzedać, link do ogłoszenia.
+- **2. Stan:** szkody (opis, kwota, opcjonalne zdjęcie), lakier, notatki.
+- **3. Zdjęcia:** grupy Sprzedawca / Moje / Inne, dowolna liczba. Kliknięcie powiększa. „Edytuj”: przeciąganie zmienia kolejność, × usuwa, lista pod zdjęciem zmienia grupę. Nowe auto zapisuje się samo przy pierwszym zdjęciu.
+- **Kosz** w stopce usuwa auto ze zdjęciami (z potwierdzeniem).
+- Okno ofert otwarte z „Rynku” nie ma „Kupiłem” (`bezZakupu`), żeby nie dodać auta drugi raz.
+- Migracja `20261110120000_dodaj_auto_3_kroki.sql`: stare koszty przeszły do „Transport” i do szkód (tylko w walucie auta); tabela `koszty` zostaje jako zapis historyczny.

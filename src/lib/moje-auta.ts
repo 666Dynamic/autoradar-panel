@@ -1,7 +1,9 @@
-// Moje auta: teczki kupionych aut w bazie Supabase (tabele moje_auta, koszty, zdjecia; schowek "moje-auta").
+// Moje auta: teczki kupionych aut w bazie Supabase (tabele moje_auta, zdjecia; schowek "moje-auta").
+// Tabela koszty została tylko jako zapis sprzed 10.11 (przeniesione do transportu i szkód).
 // Dostęp tylko po zalogowaniu do panelu. Rachunki są czystymi funkcjami (testy w __testy__).
 import type { Wiersz } from "@/lib/auta"
 import type { Szczegoly } from "@/lib/dane"
+import { markaZAuto1, paliwoZAuto1, skrzyniaZAuto1 } from "@/lib/marki"
 import { zdjeciaAuta } from "@/lib/paczka"
 import { supabase } from "@/lib/supabase"
 
@@ -18,30 +20,6 @@ export const STATUSY = [
 export type Status = (typeof STATUSY)[number][0]
 export const NAZWA_STATUSU = Object.fromEntries(STATUSY) as Record<Status, string>
 
-export const KATEGORIE = [
-  ["transport", "Transport"],
-  ["naprawa", "Naprawa"],
-  ["serwis", "Serwis"],
-  ["przygotowanie", "Przygotowanie"],
-  ["przeglad", "Przegląd i rejestracja"],
-  ["oplaty", "Opłaty"],
-  ["inne", "Inne"],
-] as const
-export type Kategoria = (typeof KATEGORIE)[number][0]
-export const NAZWA_KATEGORII = Object.fromEntries(KATEGORIE) as Record<Kategoria, string>
-
-// Lista przed sprzedażą (odhaczane w teczce).
-export const LISTA = [
-  ["przeglad", "Przegląd techniczny"],
-  ["rejestracja", "Rejestracja / tablice"],
-  ["kluczyki", "Komplet kluczyków"],
-  ["ksiazka", "Książka serwisowa / historia"],
-  ["czyszczenie", "Czyszczenie i przygotowanie"],
-  ["zdjecia", "Zdjęcia do ogłoszenia"],
-  ["otomoto", "Ogłoszenie na Otomoto"],
-  ["facebook", "Ogłoszenie na Facebooku"],
-] as const
-
 export type MojeAuto = {
   id: string
   utworzono: string
@@ -51,29 +29,41 @@ export type MojeAuto = {
   rok: number | null
   vin: string | null
   przebieg_km: number | null
-  zrodlo: "auto1" | "dania" | "inne"
-  zrodlo_id: string | null
-  link: string | null
+  marka: string | null
+  model: string | null
+  rej_miesiac: number | null
+  rej_rok: number | null
+  paliwo: string | null
+  skrzynia: string | null
+  moc_km: number | null
+  wlasciciele: string | null
+  zrodlo: "auto1" | "inna_aukcja" | "handlarz" | "prywatnie" | "inne" | "dania"
+  zrodlo_id: string | null // numer Auto1
+  link: string | null // strona aukcji, z której kupione (z „Kupiłem”)
+  ogloszenie: string | null // link do ogłoszenia sprzedaży
   zakup_kwota: number | null
   zakup_waluta: Wal
   zakup_data: string | null
   przyjazd_data: string | null
-  wystawienie_kwota: number | null
+  transport_kwota: number | null
+  wystawienie_kwota: number | null // cena, za którą chcę sprzedać
   min_zysk_kwota: number | null
-  sprzedaz_waluta: Wal // waluta ceny wystawienia, minimalnego zysku i sprzedaży
+  sprzedaz_waluta: Wal // od 10.11 nieużywana: wszystkie kwoty auta są w zakup_waluta
   sprzedaz_kwota: number | null
   sprzedaz_data: string | null
   notatka: string
+  lakier: string
+  szkody: Szkoda[]
   lista: Record<string, boolean>
 }
+export type Szkoda = { opis: string; kwota: number | null; zdjecie?: string | null }
 export type NoweAuto = Partial<Omit<MojeAuto, "id" | "utworzono" | "zmieniono">> & { nazwa: string }
 
-export type Koszt = { id: string; auto_id: string; kategoria: Kategoria; opis: string; kwota: number; waluta: Wal; data: string | null }
-// Zdjęcia w trzech grupach; PDF (umowa, faktura) trafia do „Moje”.
+// Zdjęcia w trzech grupach.
 export const RODZAJE = [
-  ["sprzedawca", "Od sprzedawcy"],
+  ["sprzedawca", "Sprzedawca"],
   ["moje", "Moje"],
-  ["szkoda", "Szkody"],
+  ["inne", "Inne"],
 ] as const
 export type Rodzaj = (typeof RODZAJE)[number][0]
 export type Zdjecie = { id: string; auto_id: string; sciezka: string; rodzaj: Rodzaj; opis: string; kolejnosc: number }
@@ -89,21 +79,24 @@ export function przelicz(kwota: number | null | undefined, z: Wal, na: Wal, kurs
 
 export type Rachunek = {
   zakup: number | null
-  koszty: number
+  koszty: number // transport + naprawy szkód
   razem: number | null // zakup + koszty
-  cena: number | null // cena sprzedaży, a przed sprzedażą cena wystawienia
+  cena: number | null // cena sprzedaży, a przed sprzedażą cena, za którą chcę sprzedać
   zysk: number | null // cena − razem
   zakonczone: boolean // zysk z prawdziwej sprzedaży
 }
 
-export function rachunek(a: MojeAuto, koszty: Koszt[], kurs: number, na: Wal): Rachunek {
-  const zakup = przelicz(a.zakup_kwota, a.zakup_waluta, na, kurs)
-  const sumaKosztow = koszty.reduce((s, k) => s + (przelicz(k.kwota, k.waluta, na, kurs) ?? 0), 0)
-  const razem = zakup === null ? null : zakup + sumaKosztow
-  const sprzedaz = przelicz(a.sprzedaz_kwota, a.sprzedaz_waluta, na, kurs)
-  const cena = sprzedaz ?? przelicz(a.wystawienie_kwota, a.sprzedaz_waluta, na, kurs)
+// Wszystkie kwoty auta są w jego walucie (zakup_waluta); `na` to waluta widoku listy.
+export function rachunek(a: MojeAuto, kurs: number, na: Wal): Rachunek {
+  const w = a.zakup_waluta
+  const kosztyAuta = (a.transport_kwota ?? 0) + a.szkody.reduce((s, x) => s + (x.kwota ?? 0), 0)
+  const zakup = przelicz(a.zakup_kwota, w, na, kurs)
+  const koszty = przelicz(kosztyAuta, w, na, kurs) ?? 0
+  const razem = zakup === null ? null : zakup + koszty
+  const sprzedaz = przelicz(a.sprzedaz_kwota, w, na, kurs)
+  const cena = sprzedaz ?? przelicz(a.wystawienie_kwota, w, na, kurs)
   const zysk = razem === null || cena === null ? null : cena - razem
-  return { zakup, koszty: sumaKosztow, razem, cena, zysk, zakonczone: sprzedaz !== null }
+  return { zakup, koszty, razem, cena, zysk, zakonczone: sprzedaz !== null }
 }
 
 // Przesunięcie zdjęcia z miejsca `z` na `na` w jego grupie: nowe numery tylko dla zdjęć, które zmieniły miejsce.
@@ -116,16 +109,33 @@ export function przesun(lista: Zdjecie[], z: number, na: number): { id: string; 
 }
 export const poKolei = (a: Zdjecie, b: Zdjecie) => a.kolejnosc - b.kolejnosc || a.sciezka.localeCompare(b.sciezka)
 
-// Daty po polsku: „07.11.2026” ⇄ „2026-11-07”. Puste albo błędne → null.
+// Daty po polsku: „08.11.2026” ⇄ „2026-11-08”. Wpisać można „8.11” (bieżący rok), „8.11.26”, „8 11 2026”, „08112026”.
 export const naPolska = (iso: string | null) => (iso ? iso.split("-").reverse().join(".") : "")
-export function zPolskiej(tekst: string): string | null {
-  const m = tekst.trim().match(/^(\d{1,2})[.\-/ ](\d{1,2})[.\-/ ](\d{2}|\d{4})$/)
-  if (!m) return null
-  const rok = m[3].length === 2 ? 2000 + Number(m[3]) : Number(m[3])
-  const d = new Date(Date.UTC(rok, Number(m[2]) - 1, Number(m[1])))
-  if (d.getUTCDate() !== Number(m[1]) || d.getUTCMonth() !== Number(m[2]) - 1) return null
-  return d.toISOString().slice(0, 10)
+export function zPolskiej(tekst: string, terazRok = new Date().getFullYear()): string | null {
+  const t = tekst.trim()
+  let czesci = t.split(/[.\-/ ,]+/).filter(Boolean)
+  if (czesci.length === 1 && /^\d{4}(\d{2}|\d{4})?$/.test(t)) czesci = [t.slice(0, 2), t.slice(2, 4), t.slice(4)].filter(Boolean)
+  if (czesci.length < 2 || czesci.length > 3 || !czesci.every((c) => /^\d+$/.test(c))) return null
+  const [d, m] = czesci.map(Number)
+  let r = czesci[2] === undefined ? terazRok : Number(czesci[2])
+  if (czesci[2] !== undefined && czesci[2].length <= 2) r += r > (terazRok % 100) + 1 ? 1900 : 2000
+  const x = new Date(Date.UTC(r, m - 1, d))
+  if (!d || !m || x.getUTCDate() !== d || x.getUTCMonth() !== m - 1) return null
+  return x.toISOString().slice(0, 10)
 }
+
+// Kwoty z groszami: wpisujesz „10250,5” → widać „10.250,5”. Kropka przed 1–2 ostatnimi cyframi też jest przecinkiem.
+export function kwotaTekst(v: string): string {
+  const s = v.replace(/\.(\d{1,2})$/, ",$1").replace(/[^\d,]/g, "")
+  const [cale, ...grosze] = s.split(",")
+  const c = cale ? Number(cale).toLocaleString("de-DE") : grosze.length ? "0" : ""
+  return grosze.length ? `${c},${grosze.join("").slice(0, 2)}` : c
+}
+export const kwotaLiczba = (v: string): number | null => {
+  const t = kwotaTekst(v)
+  return t ? Number(t.replace(/\./g, "").replace(",", ".")) : null
+}
+export const kwotaNaTekst = (n: number | null) => (n === null ? "" : kwotaTekst(String(n).replace(".", ",")))
 
 // Zapamiętana waluta (widoku albo nowych kwot), osobno dla każdej przeglądarki.
 export function pamietanaWaluta(klucz: string, domyslna: Wal): Wal {
@@ -157,20 +167,16 @@ const sprawdz = <T,>({ data, error }: { data: T | null; error: { message: string
 }
 const liczby = (a: MojeAuto): MojeAuto => ({
   ...a,
-  ...Object.fromEntries((["zakup_kwota", "wystawienie_kwota", "min_zysk_kwota", "sprzedaz_kwota"] as const).map((k) => [k, a[k] === null ? null : Number(a[k])])),
+  szkody: Array.isArray(a.szkody) ? a.szkody.map((s) => ({ ...s, kwota: s.kwota === null || s.kwota === undefined ? null : Number(s.kwota) })) : [],
+  ...Object.fromEntries((["zakup_kwota", "transport_kwota", "wystawienie_kwota", "min_zysk_kwota", "sprzedaz_kwota"] as const).map((k) => [k, a[k] === null ? null : Number(a[k])])),
 })
 
-export async function pobierzWszystko(): Promise<{ auta: MojeAuto[]; koszty: Koszt[]; zdjecia: Zdjecie[] }> {
-  const [auta, koszty, zdjecia] = await Promise.all([
+export async function pobierzWszystko(): Promise<{ auta: MojeAuto[]; zdjecia: Zdjecie[] }> {
+  const [auta, zdjecia] = await Promise.all([
     supabase.from("moje_auta").select("*").order("utworzono", { ascending: false }),
-    supabase.from("koszty").select("*").order("utworzono"),
     supabase.from("zdjecia").select("*").order("kolejnosc").order("utworzono"),
   ])
-  return {
-    auta: sprawdz(auta).map(liczby),
-    koszty: sprawdz(koszty).map((k: Koszt) => ({ ...k, kwota: Number(k.kwota) })),
-    zdjecia: sprawdz(zdjecia),
-  }
+  return { auta: sprawdz(auta).map(liczby), zdjecia: sprawdz(zdjecia) }
 }
 
 export const dodajAuto = async (a: NoweAuto) => liczby(sprawdz(await supabase.from("moje_auta").insert(a).select().single()))
@@ -180,11 +186,6 @@ export async function usunAuto(id: string, zdjecia: Zdjecie[]) {
   if (sciezki.length) await supabase.storage.from("moje-auta").remove(sciezki)
   sprawdz(await supabase.from("moje_auta").delete().eq("id", id))
 }
-export const dodajKoszt = async (k: Omit<Koszt, "id">) => {
-  const r: Koszt = sprawdz(await supabase.from("koszty").insert(k).select().single())
-  return { ...r, kwota: Number(r.kwota) }
-}
-export const usunKoszt = async (id: string) => void sprawdz(await supabase.from("koszty").delete().eq("id", id))
 export const zmienZdjecie = async (id: string, z: Partial<Zdjecie>) => sprawdz<Zdjecie>(await supabase.from("zdjecia").update(z).eq("id", id).select().single())
 export async function usunZdjecie(z: Zdjecie) {
   await supabase.storage.from("moje-auta").remove([z.sciezka])
@@ -237,7 +238,8 @@ export function stareAuta(): StareAuto[] {
   }
 }
 
-export async function przeniesStare(): Promise<number> {
+// Stare auta miały cenę wystawienia i sprzedaży w zł: przeliczone na euro (jedna waluta na auto).
+export async function przeniesStare(kurs: number): Promise<number> {
   const stare = stareAuta()
   if (!stare.length) return 0
   sprawdz(await supabase.from("moje_auta").insert(stare.map((a) => ({
@@ -247,7 +249,7 @@ export async function przeniesStare(): Promise<number> {
     status: STARY_STATUS[a.status] ?? "kupione",
     zakup_kwota: a.zakupEur, zakup_waluta: "EUR", zakup_data: a.zakupData,
     przyjazd_data: a.przyjazd,
-    wystawienie_kwota: a.wystawienie, sprzedaz_kwota: a.sprzedaz, sprzedaz_waluta: "PLN", sprzedaz_data: a.sprzedazData,
+    wystawienie_kwota: przelicz(a.wystawienie, "PLN", "EUR", kurs), sprzedaz_kwota: przelicz(a.sprzedaz, "PLN", "EUR", kurs), sprzedaz_waluta: "EUR", sprzedaz_data: a.sprzedazData,
     notatka: a.notatka ?? "",
   }))))
   try {
@@ -259,6 +261,21 @@ export async function przeniesStare(): Promise<number> {
 }
 
 // ---------- „Kupiłem” z okna auta Auto1 / Danii ----------
+
+// Dane auta z nocnego skanu (po numerze Auto1 albo z „Kupiłem”).
+export function zAuta1(r: Wiersz): Partial<MojeAuto> {
+  return {
+    marka: markaZAuto1(r.make),
+    model: r.model,
+    rok: r._year ?? null,
+    rej_miesiac: r.reg ? Number(r.reg.slice(5, 7)) || null : null,
+    rej_rok: r._year ?? null,
+    paliwo: paliwoZAuto1(r.fuel),
+    skrzynia: skrzyniaZAuto1(r.gear),
+    moc_km: r.hp,
+    przebieg_km: r.km,
+  }
+}
 
 const KLUCZ_OTWORZ = "ar_moje_auta_otworz"
 export const doOtwarcia = () => {
@@ -294,10 +311,9 @@ export function oczekujaceZdjecia(id: string): string[] {
 // Zakłada teczkę z danymi auta z listy; zdjęcia (linki Auto1 wygasają po aukcji) kopiuje potem strona Moje auta.
 export async function kupilem(r: Wiersz, s: Szczegoly | undefined, zmiany: Partial<MojeAuto> = {}): Promise<{ auto: MojeAuto; adresy: string[] }> {
   const auto = await dodajAuto({
+    ...zAuta1(r),
     nazwa: r.title || r.id,
-    rok: r._year ?? null,
     vin: r.dania?.vin ?? null,
-    przebieg_km: r.km,
     zrodlo: r.dania ? "dania" : "auto1",
     zrodlo_id: r.id,
     link: r.auto1_url,

@@ -287,7 +287,8 @@ function Kupilem({ auto, s, zamknij }: { auto: Wiersz; s?: Szczegoly; zamknij: (
   )
 }
 
-export function OknoAuta({ auto, waluta, kurs, zamknij, widziany }: { auto: Wiersz | null; waluta: Waluta; kurs: number; zamknij: () => void; widziany: (id: string) => void }) {
+// bezZakupu: okno otwarte z Moich aut (auto już tam jest), więc bez „Kupiłem”, żeby nie dodać go drugi raz.
+export function OknoAuta({ auto, waluta, kurs, zamknij, widziany, bezZakupu }: { auto: Wiersz | null; waluta: Waluta; kurs: number; zamknij: () => void; widziany: (id: string) => void; bezZakupu?: boolean }) {
   const [szczegoly, ustaw] = React.useState<Record<string, Szczegoly> | null>(null)
   React.useEffect(() => {
     if (auto && !auto.dania) wczytajSzczegoly().then(ustaw) // Dania nie ma szczegoly.json
@@ -311,7 +312,7 @@ export function OknoAuta({ auto, waluta, kurs, zamknij, widziany }: { auto: Wier
               {mobile && <Button asChild variant="outline" size="sm" className="flex-1"><a href={mobile} target="_blank" rel="noopener">mobile.de<ExternalLinkIcon /></a></Button>}
               {s?.report && <Button asChild variant="outline" size="sm" className="flex-1"><a href={s.report} target="_blank" rel="noopener">Raport<ExternalLinkIcon /></a></Button>}
               {!dk && <Button size="sm" className="flex-1" onClick={() => { zamknij(); zrobOgloszenie(auto.id) }}><MegaphoneIcon />Zrób ogłoszenie</Button>}
-              <Kupilem key={auto.id} auto={auto} s={s} zamknij={zamknij} />
+              {!bezZakupu && <Kupilem key={auto.id} auto={auto} s={s} zamknij={zamknij} />}
             </div>
             <Ceny auto={auto} waluta={waluta} />
             {dk ? (

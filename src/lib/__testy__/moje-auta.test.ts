@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import { linkOtomoto } from "@/lib/marki"
 import { kwotaLiczba, kwotaTekst, przelicz, przesun, rachunek, zPolskiej, type MojeAuto, type Zdjecie } from "@/lib/moje-auta"
+import { linkiSprawdzenia } from "@/lib/sprawdz"
 import { rozpoznajVin } from "@/lib/vin"
 
 const auto = (z: Partial<MojeAuto> = {}): MojeAuto => ({
@@ -96,5 +97,14 @@ describe("VIN bez płatnych serwisów", () => {
     expect(rozpoznajVin("SAJAA05P7JPA00001")?.model).toBeNull()
     expect(rozpoznajVin("XXX0000000000000A")?.marka).toBeNull()
     expect(rozpoznajVin("WVW123")).toBeNull()
+  })
+})
+
+describe("Sprawdzenie auta po VIN", () => {
+  it("Dania: przeglądy, Tjekbil, Nummerplade i carVertical; inne auta: carVertical", () => {
+    expect(linkiSprawdzenia("wvwzzzauzjw000001", true).map((l) => l.nazwa)).toEqual(["Przeglądy DK", "Tjekbil", "Nummerplade", "carVertical"])
+    expect(linkiSprawdzenia("WVWZZZAUZJW000001", false)).toEqual([{ nazwa: "carVertical", url: "https://www.carvertical.com/pl/precheck?vin=WVWZZZAUZJW000001" }])
+    expect(linkiSprawdzenia("WVW123", true)).toEqual([])
+    expect(linkiSprawdzenia(null, true)).toEqual([])
   })
 })

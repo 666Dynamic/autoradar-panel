@@ -9,15 +9,12 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Wybor } from "@/components/wybor"
-import { FUEL, GEAR, wyposazenie } from "@/lib/auta"
 import { wczytajSzczegoly, type Dane } from "@/lib/dane"
-import { KRAJE_OGLOSZEN, POLA_OGLOSZENIA, WZORY, ogloszenie, rozpoznajTekst, autoDoOgloszenia, wzorZPamieci, type Ogloszenie } from "@/lib/ogloszenia"
+import { KRAJE_OGLOSZEN, POLA_OGLOSZENIA, WZORY, ogloszenie, ogloszenieZAuto1, rozpoznajTekst, autoDoOgloszenia, wzorZPamieci, type Ogloszenie } from "@/lib/ogloszenia"
 
 const PALIWA: [string, string][] = ["Diesel", "Benzyna", "Hybryda", "Hybryda plug-in", "Elektryczny", "Benzyna + LPG"].map((x) => [x, x])
 const SKRZYNIE: [string, string][] = [["Automat", "Automat"], ["Manualna", "Manualna"]]
 const KLUCZ = "ar_ogloszenie"
-
-const wielka = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 // Szkic ogłoszenia i wybrany wzór zostają w tej przeglądarce.
 function odczytajSzkic(): { pola: Ogloszenie; wzor: string } {
@@ -61,21 +58,7 @@ export function Ogloszenia({ dane }: { dane: Dane | null }) {
     const r = dane?.rows.find((x) => x.id.toUpperCase() === id)
     if (!r) return toast.error(dane ? "Nie ma takiego auta w ostatnim skanie." : "Dane skanu jeszcze się wczytują.")
     const s = (await wczytajSzczegoly())[r.id]
-    const nazwa = [r.make, r.model].filter(Boolean).join(" ")
-    const kraj = s?.country ?? s?.countryCode
-    ustawO((x) => ({
-      ...POLA_OGLOSZENIA, waluta: x.waluta,
-      kraj: kraj && KRAJE_OGLOSZEN.some(([k]) => k === kraj) ? kraj : x.kraj,
-      auto: nazwa || r.title,
-      wersja: nazwa && r.title.startsWith(nazwa) ? r.title.slice(nazwa.length).trim() : r.title,
-      paliwo: r.fuel ? wielka(FUEL[r.fuel] ?? r.fuel) : "",
-      skrzynia: r.gear ? wielka(GEAR[r.gear] ?? r.gear) : "",
-      rejestracja: r.reg ? `${r.reg.slice(5, 7)}.${r.reg.slice(0, 4)}` : "",
-      przebieg: r.km != null ? String(r.km) : "",
-      moc: r.hp != null ? String(r.hp) : "",
-      atuty: wyposazenie(s).map(wielka).join("\n"),
-      kolor: typeof s?.colour === "string" ? s.colour : "",
-    }))
+    ustawO((x) => ({ ...ogloszenieZAuto1(r, s, x.kraj), waluta: x.waluta }))
     toast.success("Wczytano dane auta. Dopisz cenę i VIN.")
   }, [dane])
   const wczytaj = () => wczytajAuto(numer)

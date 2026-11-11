@@ -16,6 +16,7 @@ import { Wybor } from "@/components/wybor"
 import { przygotuj, type Wiersz } from "@/lib/auta"
 import type { Dane } from "@/lib/dane"
 import { linkOtomoto, MARKI, PALIWA, SKRZYNIE, ZRODLA } from "@/lib/marki"
+import { linkiSprawdzenia } from "@/lib/sprawdz"
 import {
   czyPdf, dodajAuto, kwotaLiczba, kwotaNaTekst, kwotaTekst, naPolska, pamietanaWaluta, poKolei, przesun, RODZAJE, STATUSY,
   usunAuto, usunZdjecie, zAuta1, zapamietajWalute, zmienAuto, zmienZdjecie, zPolskiej,
@@ -344,6 +345,14 @@ export function OknoMojegoAuta({ auto, otwarte, zamknij, dane, kurs, zdjecia, ad
                 </>
               )}
             </Podpowiedz>
+          )}
+          {linkiSprawdzenia(czystyVin(f.vin), f.zrodlo === "dania").length > 0 && (
+            <div className="flex flex-wrap items-center gap-x-1 gap-y-0.5 text-sm text-muted-foreground">
+              <span className="mr-1">Sprawdź auto:</span>
+              {linkiSprawdzenia(czystyVin(f.vin), f.zrodlo === "dania").map((l) => (
+                <Button key={l.nazwa} asChild variant="link" size="sm" className="h-7 px-1.5"><a href={l.url} target="_blank" rel="noopener">{l.nazwa}<ExternalLinkIcon /></a></Button>
+              ))}
+            </div>
           )}
         </Pole>
         <Pole id="ma-marka" etykieta="Marka">

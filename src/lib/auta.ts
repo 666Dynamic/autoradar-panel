@@ -220,23 +220,5 @@ export function oplatyAuto1(s?: Szczegoly) {
   return { obsluga, dokumenty: kraj === "PL" ? krajowe : miedzynarodowe, krajowe: kraj === "PL", pewne: stawki !== undefined, kraj: kraj ? KRAJE[kraj] ?? kraj : null }
 }
 
-// Teksty bez ceny zakupu i bez linku do Auto1. Krótkie: dane w jednej linii, dodatki w drugiej.
-function linieOferty(r: Auto, s?: Szczegoly) {
-  const sprzet = wyposazenie(s)
-  return [
-    specyfikacja(r).map(([, v]) => v).filter((v) => v !== "—").join(" · "),
-    dodatki(s).map(([k, v]) => `${k.toLowerCase()} ${v}`).join(" · "),
-    sprzet.length ? `Wyposażenie: ${sprzet.join(", ")}` : "",
-  ].filter(Boolean)
-}
-
-export function tekstWhatsApp(r: Auto, s?: Szczegoly) {
-  return [r.title, ...linieOferty(r, s)].join("\n")
-}
-
-export function tekstFacebook(r: Auto, s?: Szczegoly) {
-  return [`🚗 ${r.title}`, ...linieOferty(r, s).map((x) => `✅ ${x}`), "Zainteresowany? Napisz wiadomość."].join("\n")
-}
-
 // Zmiana ceny Auto1 od poprzedniej udanej nocy, w euro; 0 gdy bez zmian albo bez historii.
 export const zmianaCeny = (r: Auto) => (r.a_prev_eur != null && r.a_eur != null ? Math.round(r.a_eur - r.a_prev_eur) : 0)

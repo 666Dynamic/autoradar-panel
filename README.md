@@ -77,3 +77,7 @@ Plik `src/components/okno-mojego-auta.tsx`. Jedno okno na „Dodaj auto” i na 
 - **Kosz** w stopce usuwa auto ze zdjęciami (z potwierdzeniem).
 - Okno ofert otwarte z „Rynku” nie ma „Kupiłem” (`bezZakupu`), żeby nie dodać auta drugi raz.
 - Migracja `20261110120000_dodaj_auto_3_kroki.sql`: stare koszty przeszły do „Transport” i do szkód (tylko w walucie auta); tabela `koszty` zostaje jako zapis historyczny.
+
+### Okno auta Auto1 i Danii (od 11.11)
+- Jedno okno, ten sam układ: przyciski Otomoto / mobile.de / Kupiłem (Auto1 dodatkowo „Auto1” i „Raport”), linijka „Sprawdź auto”, blok „Post” z wzorami właściciela (`ogloszenieZAuto1` w `src/lib/ogloszenia.ts`, `doOgloszenia` w `src/lib/dania.ts`). Przycisku „Zrób ogłoszenie” nie ma.
+- „Sprawdź auto” (`src/lib/sprawdz.ts`): Dania po VIN: Przeglądy DK (Færdselsstyrelsen), Tjekbil, Nummerplade, carVertical. Auto1 nie podaje VIN-u w skanie, więc tylko carVertical bez numeru. W Moich autach linki pod polem VIN. Panel niczego z tych stron nie pobiera.

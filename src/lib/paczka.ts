@@ -1,9 +1,9 @@
 import type JSZip from "jszip"
 
-import { dodatki, hpLabel, kmLabel, litersLabel, offersLabel, regLabel, specyfikacjaAuta, tekstFacebook, tekstWhatsApp, wyposazenie, type Wiersz } from "@/lib/auta"
+import { dodatki, hpLabel, kmLabel, litersLabel, offersLabel, regLabel, specyfikacjaAuta, wyposazenie, type Wiersz } from "@/lib/auta"
 import { doOgloszenia, type AutoDania } from "@/lib/dania"
 import { wczytajSzczegoly, type Szczegoly } from "@/lib/dane"
-import { ogloszenie } from "@/lib/ogloszenia"
+import { ogloszenie, ogloszenieZAuto1 } from "@/lib/ogloszenia"
 import { odczytajOferty } from "@/lib/pamiec"
 
 // Serwer zdjęć Auto1 nie pozwala stronie czytać plików, więc idą przez pośrednika worker.mjs.
@@ -73,9 +73,9 @@ export async function pobierzPaczke(auta: Wiersz[], postep: (gotowe: number, raz
     const o = oferty[r.id]
     const folder = zip.folder(nazwa(r.make ?? "Inne"))!.folder(`${nazwa(r.title)} ${r.id}`)!
     folder.file("oferta.txt", trescOferty(r, s))
-    const post = r.dania ? doOgloszenia(r as AutoDania) : null // Dania: posty jak w oknie (cena dostawcy + marża)
-    folder.file("whatsapp.txt", o?.whatsapp ?? (post ? ogloszenie(post, "whatsapp") : tekstWhatsApp(r, s)))
-    folder.file("facebook.txt", o?.facebook ?? (post ? ogloszenie(post, "zamowienie") : tekstFacebook(r, s)))
+    const post = r.dania ? doOgloszenia(r as AutoDania) : ogloszenieZAuto1(r, s) // posty jak w oknie auta
+    folder.file("whatsapp.txt", o?.whatsapp ?? ogloszenie(post, "whatsapp"))
+    folder.file("facebook.txt", o?.facebook ?? ogloszenie(post, "zamowienie"))
     const wybrane = o?.zdjecia?.length ? o.zdjecia : zdjeciaAuta(r, s) // nic nie wybrane: wszystkie
     wybrane.forEach((url, i) => zadania.push({ url, folder, plik: `${String(i + 1).padStart(2, "0")}.jpg` }))
   }

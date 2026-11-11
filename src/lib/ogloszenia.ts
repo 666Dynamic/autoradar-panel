@@ -1,4 +1,5 @@
-import { fmt } from "@/lib/auta"
+import { FUEL, GEAR, fmt, kolorPL, wyposazenie } from "@/lib/auta"
+import type { Auto, Szczegoly } from "@/lib/dane"
 
 // Kraj: flaga i „z …” do nagłówka. Polska bez sprowadzania, więc bez „z”.
 export const KRAJE_OGLOSZEN: [string, string, string, string][] = [
@@ -155,5 +156,26 @@ export function autoDoOgloszenia(usun = false) {
     return id
   } catch {
     return null
+  }
+}
+
+const wielka = (t: string) => t.charAt(0).toUpperCase() + t.slice(1)
+
+// Auto z nocnego skanu Auto1 → pola ogłoszenia. Auto1 nie podaje w liście VIN-u ani ceny sprzedaży: dopisuje się je w tekście.
+export function ogloszenieZAuto1(r: Auto, s?: Szczegoly, domyslnyKraj = "DE"): Ogloszenie {
+  const nazwa = [r.make, r.model].filter(Boolean).join(" ")
+  const kraj = s?.country ?? s?.countryCode
+  return {
+    ...POLA_OGLOSZENIA,
+    kraj: kraj && KRAJE_OGLOSZEN.some(([k]) => k === kraj) ? kraj : domyslnyKraj,
+    auto: nazwa || r.title,
+    wersja: nazwa && r.title.startsWith(nazwa) ? r.title.slice(nazwa.length).trim() : r.title,
+    paliwo: r.fuel ? wielka(FUEL[r.fuel] ?? r.fuel) : "",
+    skrzynia: r.gear ? wielka(GEAR[r.gear] ?? r.gear) : "",
+    rejestracja: r.reg ? `${r.reg.slice(5, 7)}.${r.reg.slice(0, 4)}` : "",
+    przebieg: r.km != null ? String(r.km) : "",
+    moc: r.hp != null ? String(r.hp) : "",
+    atuty: wyposazenie(s).map(wielka).join("\n"),
+    kolor: typeof s?.colour === "string" ? kolorPL(s.colour) ?? s.colour : "",
   }
 }

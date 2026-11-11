@@ -1,5 +1,5 @@
 import * as React from "react"
-import { CheckIcon, CopyIcon, DownloadIcon, ExternalLinkIcon, FolderOpenIcon, MegaphoneIcon, ShoppingCartIcon } from "lucide-react"
+import { CheckIcon, CopyIcon, DownloadIcon, ExternalLinkIcon, FolderOpenIcon, ShoppingCartIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
@@ -12,12 +12,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-import { dodatki, endLabel, kolorPL, powodBraku, kwota, lokalizacja, offersLabel, oplatyAuto1, pieniadze, specyfikacjaAuta, stawkaAkcyzy, tekstFacebook, tekstWhatsApp, wyposazenieOkna, type Waluta, type Wiersz } from "@/lib/auta"
+import { dodatki, endLabel, kolorPL, powodBraku, kwota, lokalizacja, offersLabel, oplatyAuto1, pieniadze, specyfikacjaAuta, stawkaAkcyzy, wyposazenieOkna, type Waluta, type Wiersz } from "@/lib/auta"
 import { MARZA, OPIS_TYPU, doOgloszenia, type AutoDania } from "@/lib/dania"
 import { wczytajSzczegoly, type Szczegoly } from "@/lib/dane"
 import { linkMobile } from "@/lib/mobile"
+import { CARVERTICAL, linkiSprawdzenia } from "@/lib/sprawdz"
 import { kupilem, kupilemIOtworz } from "@/lib/moje-auta"
-import { ogloszenie, zrobOgloszenie } from "@/lib/ogloszenia"
+import { ogloszenie, ogloszenieZAuto1, type Ogloszenie } from "@/lib/ogloszenia"
 import { pobierzPaczke, zdjeciaAuta } from "@/lib/paczka"
 import { ostrzezenie } from "@/lib/ostrzezenia"
 import { odczytajOferty, odczytajTransport, zapiszOferte, zapiszTransport } from "@/lib/pamiec"
@@ -242,10 +243,8 @@ function KosztCalkowity({ auto, s, waluta, kurs }: { auto: Wiersz; s?: Szczegoly
   )
 }
 
-// Dania: gotowy post do ręcznej publikacji (cena dostawcy + marża) i zdjęcia z folderu dostawcy.
-// Tekst można poprawić; zostaje w tej przeglądarce jak teksty aut z Auto1.
-function PostDania({ auto }: { auto: AutoDania }) {
-  const o = doOgloszenia(auto)
+// Post do ręcznej publikacji, ten sam w Auto1 i Danii (wzory właściciela). Tekst można poprawić; zostaje w tej przeglądarce.
+function Post({ id, o, zip, dopisek }: { id: string; o: Ogloszenie; zip?: string | null; dopisek: string }) {
   return (
     <div className="flex flex-col gap-2 rounded-lg border p-3">
       <h3 className="text-sm font-medium">Post</h3>
@@ -254,16 +253,12 @@ function PostDania({ auto }: { auto: AutoDania }) {
           <TabsTrigger value="facebook">Możliwość sprowadzenia</TabsTrigger>
           <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
         </TabsList>
-        <TabsContent value="facebook"><Tekst id={auto.id} rodzaj="facebook" domyslny={ogloszenie(o, "zamowienie")} /></TabsContent>
-        <TabsContent value="whatsapp"><Tekst id={auto.id} rodzaj="whatsapp" domyslny={ogloszenie(o, "whatsapp")} /></TabsContent>
+        <TabsContent value="facebook"><Tekst id={id} rodzaj="facebook" domyslny={ogloszenie(o, "zamowienie")} /></TabsContent>
+        <TabsContent value="whatsapp"><Tekst id={id} rodzaj="whatsapp" domyslny={ogloszenie(o, "whatsapp")} /></TabsContent>
       </Tabs>
-      <div className="flex flex-wrap gap-2">
-        {/* Zip z Dropboxa (dl=1) pobiera przeglądarka, serwer niczego z Dropboxa nie pobiera. */}
-        {auto.dania.zip && <Button asChild size="sm" className="flex-1"><a href={auto.dania.zip} target="_blank" rel="noopener"><DownloadIcon />Pobierz wszystkie zdjęcia (ZIP)</a></Button>}
-      </div>
-      <p className="text-xs text-muted-foreground">
-        Cena w poście: cena dostawcy + {pieniadze(MARZA, "eur")}.{!auto.dania.folder && " Dostawca nie podał folderu zdjęć."}
-      </p>
+      {/* Zip z Dropboxa (dl=1) pobiera przeglądarka, serwer niczego z Dropboxa nie pobiera. */}
+      {zip && <Button asChild size="sm"><a href={zip} target="_blank" rel="noopener"><DownloadIcon />Pobierz wszystkie zdjęcia (ZIP)</a></Button>}
+      <p className="text-xs text-muted-foreground">{dopisek}</p>
     </div>
   )
 }
@@ -311,8 +306,14 @@ export function OknoAuta({ auto, waluta, kurs, zamknij, widziany, bezZakupu }: {
               {auto.search_url && <Button asChild variant="outline" size="sm" className="flex-1"><a href={auto.search_url} target="_blank" rel="noopener" onClick={() => widziany(auto.id)}>Otomoto<ExternalLinkIcon /></a></Button>}
               {mobile && <Button asChild variant="outline" size="sm" className="flex-1"><a href={mobile} target="_blank" rel="noopener">mobile.de<ExternalLinkIcon /></a></Button>}
               {s?.report && <Button asChild variant="outline" size="sm" className="flex-1"><a href={s.report} target="_blank" rel="noopener">Raport<ExternalLinkIcon /></a></Button>}
-              {!dk && <Button size="sm" className="flex-1" onClick={() => { zamknij(); zrobOgloszenie(auto.id) }}><MegaphoneIcon />Zrób ogłoszenie</Button>}
               {!bezZakupu && <Kupilem key={auto.id} auto={auto} s={s} zamknij={zamknij} />}
+            </div>
+            {/* Sprawdzenie auta: tylko linki, panel niczego z tych stron nie pobiera. */}
+            <div className="-mt-2 flex flex-wrap items-center gap-x-1 gap-y-0.5 text-sm text-muted-foreground">
+              <span className="mr-1">Sprawdź auto:</span>
+              {(dk ? linkiSprawdzenia(dk.dania.vin, true) : [CARVERTICAL]).map((l) => (
+                <Button key={l.nazwa} asChild variant="link" size="sm" className="h-7 px-1.5"><a href={l.url} target="_blank" rel="noopener">{l.nazwa}<ExternalLinkIcon /></a></Button>
+              ))}
             </div>
             <Ceny auto={auto} waluta={waluta} />
             {dk ? (
@@ -340,24 +341,16 @@ export function OknoAuta({ auto, waluta, kurs, zamknij, widziany, bezZakupu }: {
                 ["Ofert Otomoto", offersLabel(auto)], ...(auto.d_eur === null ? [["Bez porównania", powodBraku(auto)] as [string, string]] : []),
                 ...(ostrzezenie(auto) ? [["Uwaga", "średnia z jednej oferty, sprawdź ręcznie"] as [string, string]] : [])]} />}
             </div>
-            {dk && <PostDania key={`post-${auto.id}`} auto={dk} />}
             {!dk && <KosztCalkowity key={`koszt-${auto.id}`} auto={auto} s={s} waluta={waluta} kurs={kurs} />}
+            {dk ? <Post key={`post-${auto.id}`} id={auto.id} o={doOgloszenia(dk)} zip={dk.dania.zip}
+                dopisek={`Cena w poście: cena dostawcy + ${pieniadze(MARZA, "eur")}.${dk.dania.folder ? "" : " Dostawca nie podał folderu zdjęć."}`} />
+              : szczegoly && <Post key={`post-${auto.id}`} id={auto.id} o={ogloszenieZAuto1(auto, s)} dopisek="Auto1 nie podaje VIN-u ani ceny sprzedaży: dopisz je w tekście." />}
             {sprzet.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {sprzet.map(([nazwa, rzadkie]) => <Badge key={nazwa} variant={rzadkie ? "secondary" : "outline"}>{nazwa}</Badge>)}
               </div>
             )}
             {s?.prices?.length ? <HistoriaCeny ceny={s.prices} waluta={waluta} kurs={kurs} /> : null}
-            {szczegoly && !dk && (
-              <Tabs key={`teksty-${auto.id}`} defaultValue="whatsapp">
-                <TabsList>
-                  <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
-                  <TabsTrigger value="facebook">Facebook</TabsTrigger>
-                </TabsList>
-                <TabsContent value="whatsapp"><Tekst id={auto.id} rodzaj="whatsapp" domyslny={tekstWhatsApp(auto, s)} /></TabsContent>
-                <TabsContent value="facebook"><Tekst id={auto.id} rodzaj="facebook" domyslny={tekstFacebook(auto, s)} /></TabsContent>
-              </Tabs>
-            )}
             <DialogFooter>
               <DialogClose asChild><Button className="w-full">Zamknij</Button></DialogClose>
             </DialogFooter>

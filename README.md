@@ -4,7 +4,9 @@ Panel AutoRadar na GitHub Pages: https://666dynamic.github.io/autoradar-panel/
 
 Podstrony: Start, Auto1, Dania (Auto Midt), Wycena, Moje auta, Ogłoszenia.
 
-Dane z nocy czyta z repozytorium `autoradar-migawka` (`https://666dynamic.github.io/autoradar-migawka/`):
+Start: stan nocy i karta „Najwięcej na Auto1” (top 5 modeli, marek i typów z dzisiejszej listy Auto1; generacje modelu liczone razem, `src/lib/statystyki.ts`).
+
+Dane z nocy czyta po zalogowaniu z prywatnego schowka Supabase `dane` (podpisane linki; publiczna migawka wyłączona 15.11):
 - `data.json` (Auto1, ok. 6 MB): tylko Start, Auto1, Moje auta i Ogłoszenia;
 - `szczegoly.json`: zdjęcia i wyposażenie, przy pierwszym otwarciu okna auta;
 - `dania.json` i `dania/<VIN>/`: krok Danii.
@@ -17,7 +19,7 @@ Cały panel jest za jednym wspólnym hasłem (konto `panel@autoradar.app` w proj
 - Hasło ustawia albo zmienia właściciel: `sh skrypty/ustaw-haslo.sh` (wpisuje je w terminalu, nikt inny go nie widzi). Zakładanie nowych kont jest wyłączone.
 - Moje auta: tabele `moje_auta` (z szkodami i transportem), `zdjecia` (oraz stara `koszty` tylko do odczytu historii) i prywatny schowek `moje-auta` (zdjęcia zmniejszane w przeglądarce do 2000 px). Schemat: `supabase/migrations/`. Bez zalogowania baza nic nie zwraca (RLS).
 - Klucz w `src/lib/supabase.ts` jest publiczny z założenia; klucz serwisowy i hasło bazy nigdy nie trafiają do repo.
-- Dane nocy (`autoradar-migawka`) są na razie publiczne; przeniesienie ich za hasło to następny krok.
+- Dane nocy leżą w prywatnym schowku `dane`; bez zalogowania niedostępne.
 - Darmowy projekt usypia się po 7 dniach bez ruchu: `.github/workflows/supabase-ping.yml` pinguje go codziennie.
 - Kopia na T7: `python3 skrypty/kopia-moje-auta.py <folder>` (wołana przez `tools/kopia-na-t7.sh` w repo AutoRadar).
 - Zmiana schematu: nowy plik w `supabase/migrations/`, potem `npx supabase db push`.

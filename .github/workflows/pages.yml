@@ -19,7 +19,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      # Bez publikacji, gdy lint albo testy (też na dzisiejszych danych z migawki) nie przejdą.
+      # Bez publikacji, gdy lint albo testy nie przejdą (test prawdziwych danych idzie lokalnie, na kopii ze schowka).
       - run: npm run lint
       - run: npm test
       - run: npm run build

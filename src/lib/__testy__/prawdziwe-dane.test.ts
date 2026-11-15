@@ -6,15 +6,11 @@ import type { Auto } from "@/lib/dane"
 import { zPliku } from "@/lib/dania"
 import { linkMobile } from "@/lib/mobile"
 
-// Dzisiejsze dane: lokalna kopia z public/test-dane, a bez niej (GitHub Actions) plik z migawki.
-const MIGAWKA = "https://666dynamic.github.io/autoradar-migawka/"
-async function plik(nazwa: string) {
-  const lokalny = `public/test-dane/${nazwa}`
-  if (existsSync(lokalny)) return JSON.parse(readFileSync(lokalny, "utf8"))
-  const o = await fetch(MIGAWKA + nazwa)
-  if (!o.ok) throw new Error(`${nazwa}: ${o.status}`)
-  return o.json()
-}
+// Dzisiejsze dane: lokalna kopia z public/test-dane (pobrana ze schowka). Publiczna migawka jest wyłączona (15.11),
+// a schowek wymaga logowania, więc bez lokalnej kopii (GitHub Actions) ten test się pomija.
+const KATALOG = "public/test-dane/"
+const MAMY_DANE = existsSync(KATALOG + "data.json") && existsSync(KATALOG + "dania.json")
+const plik = (nazwa: string) => JSON.parse(readFileSync(KATALOG + nazwa, "utf8"))
 // Polska etykieta nie może być surowym kodem z nocy (WIELKIE_LITERY_Z_PODKRESLENIEM ani angielskim słowem).
 const ANGIELSKIE = /^[A-Z0-9_]{4,}$|^(petrol|electro|electric|hybrid|manual|automatic|other|gas|duplex)$/
 
@@ -34,9 +30,9 @@ function sprawdz(rows: Auto[], nazwa: string) {
   })
 }
 
-describe("prawdziwe dane", async () => {
-  const auto1 = await plik("data.json")
-  const dania = zPliku(await plik("dania.json"))
+describe.skipIf(!MAMY_DANE)("prawdziwe dane", () => {
+  const auto1 = plik("data.json")
+  const dania = zPliku(plik("dania.json"))
   sprawdz(auto1.rows, "Auto1")
   sprawdz(dania.rows, "Dania")
   it("Dania: każde porównane auto ma link mobile.de z cn=DE", () => {

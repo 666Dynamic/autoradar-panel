@@ -3,11 +3,14 @@ import * as React from "react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardAction, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Progress } from "@/components/ui/progress"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { fmt, powodBledu } from "@/lib/auta"
-import type { Auto, Dane, Noc, Rynek } from "@/lib/dane"
+import type { Auto, Dane, Noc } from "@/lib/dane"
+import { najczestsze, type Podzial } from "@/lib/statystyki"
 
 // Skan publikuje co noc; starsze dane znaczą, że ostatni się nie udał albo został zablokowany.
 const STALE_HOURS = 26
@@ -62,37 +65,41 @@ function Status({ noc }: { noc: Noc }) {
   return <Badge variant={zly ? "destructive" : "outline"}>{(noc.status && STATUS[noc.status]) || noc.status || "—"}</Badge>
 }
 
-const procent = (p: number | null | undefined) => (p == null ? "—" : `${p > 0 ? "+" : ""}${p.toString().replace(".", ",")}%`)
+const PODZIALY: [Podzial, string][] = [["modele", "Modele"], ["marki", "Marki"], ["typy", "Typy"]]
 
-// Ile dni ogłoszenia wiszą do zniknięcia i jak zmienia się średnia Otomoto, w oknie 30 i 90 dni.
-function RynekKafelki({ rynek }: { rynek: Rynek }) {
+// Najczęstsze auta na dzisiejszej liście Auto1 (cała lista, nie wycinek).
+function NajwiecejNaAuto1({ rows }: { rows: Auto[] }) {
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-baseline justify-between gap-2">
-        <h2 className="font-semibold">Rynek Otomoto</h2>
-        <span className="text-xs text-muted-foreground">z {rynek.nights} nocy, od {dzien(rynek.since)}</span>
-      </div>
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {rynek.windows.map((w) => (
-          <React.Fragment key={w.days}>
-            <Card>
-              <CardHeader>
-                <CardDescription>Dni do zniknięcia ogłoszenia, {w.days} dni</CardDescription>
-                <CardTitle className="text-xl font-semibold tabular-nums lg:text-2xl">{w.median_days == null ? "—" : fmt(w.median_days)}</CardTitle>
-                <div className="text-xs text-muted-foreground">mediana z {fmt(w.counted)}, zniknęło {fmt(w.gone)}</div>
-              </CardHeader>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardDescription>Zmiana średniej Otomoto, {w.days} dni</CardDescription>
-                <CardTitle className="text-xl font-semibold tabular-nums lg:text-2xl">{procent(w.trend?.change_pct)}</CardTitle>
-                <div className="text-xs text-muted-foreground">{w.trend ? `od ${dzien(w.trend.from)}, ${fmt(w.trend.searches)} wyszukiwań` : "za mało nocy"}</div>
-              </CardHeader>
-            </Card>
-          </React.Fragment>
-        ))}
-      </div>
-    </div>
+    <Card>
+      <CardHeader>
+        <CardTitle>Najwięcej na Auto1</CardTitle>
+        <CardDescription>Dzisiejsza lista Auto1, {fmt(rows.length)} aut. Generacje modelu liczone razem (Golf VII i VIII = Golf).</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Tabs defaultValue="modele">
+          <TabsList>
+            {PODZIALY.map(([v, n]) => <TabsTrigger key={v} value={v}>{n}</TabsTrigger>)}
+          </TabsList>
+          {PODZIALY.map(([v]) => {
+            const lista = najczestsze(rows, v)
+            const max = lista[0]?.ile ?? 1
+            return (
+              <TabsContent key={v} value={v} className="flex flex-col gap-3 pt-2">
+                {lista.map((p) => (
+                  <div key={p.nazwa + (p.opis ?? "")} className="flex flex-col gap-1.5">
+                    <div className="flex items-baseline justify-between gap-2 text-sm">
+                      <span className="min-w-0">{p.nazwa}{p.opis && <span className="text-muted-foreground"> · {p.opis}</span>}</span>
+                      <span className="font-medium tabular-nums">{fmt(p.ile)}</span>
+                    </div>
+                    <Progress value={(p.ile / max) * 100} />
+                  </div>
+                ))}
+              </TabsContent>
+            )
+          })}
+        </Tabs>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -129,7 +136,7 @@ export function Home({ dane }: { dane: Dane }) {
           </Card>
         ))}
       </div>
-      {dane.market && <RynekKafelki rynek={dane.market} />}
+      <NajwiecejNaAuto1 rows={rows} />
       <div className="overflow-x-auto rounded-lg border">
         <Table>
           <TableHeader>

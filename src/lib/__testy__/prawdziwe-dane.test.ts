@@ -30,7 +30,8 @@ function sprawdz(rows: Auto[], nazwa: string) {
   })
 }
 
-describe.skipIf(!MAMY_DANE)("prawdziwe dane", () => {
+describe("prawdziwe dane", () => {
+  if (!MAMY_DANE) return void it.skip("brak lokalnej kopii danych", () => {})
   const auto1 = plik("data.json")
   const dania = zPliku(plik("dania.json"))
   sprawdz(auto1.rows, "Auto1")

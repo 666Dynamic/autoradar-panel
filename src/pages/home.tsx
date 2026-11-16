@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { fmt, powodBledu } from "@/lib/auta"
 import type { Auto, Dane, Noc } from "@/lib/dane"
+import { wczytajDaniaBezZdjec } from "@/lib/dania"
 import { najczestsze, type Podzial } from "@/lib/statystyki"
 
 // Skan publikuje co noc; starsze dane znaczą, że ostatni się nie udał albo został zablokowany.
@@ -67,13 +68,13 @@ function Status({ noc }: { noc: Noc }) {
 
 const PODZIALY: [Podzial, string][] = [["modele", "Modele"], ["marki", "Marki"], ["typy", "Typy"]]
 
-// Najczęstsze auta na dzisiejszej liście Auto1 (cała lista, nie wycinek).
-function NajwiecejNaAuto1({ rows }: { rows: Auto[] }) {
+// Najczęstsze auta na liście (cała lista, nie wycinek): Auto1 albo Dania.
+function Najwiecej({ tytul, opis, rows }: { tytul: string; opis: string; rows: Auto[] }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Najwięcej na Auto1</CardTitle>
-        <CardDescription>Dzisiejsza lista Auto1, {fmt(rows.length)} aut. Generacje modelu liczone razem (Golf VII i VIII = Golf).</CardDescription>
+        <CardTitle>{tytul}</CardTitle>
+        <CardDescription>{opis} Generacje modelu liczone razem (Golf VII i VIII = Golf).</CardDescription>
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="modele">
@@ -100,6 +101,26 @@ function NajwiecejNaAuto1({ rows }: { rows: Auto[] }) {
         </Tabs>
       </CardContent>
     </Card>
+  )
+}
+
+// Dania to osobny plik nocy (mały); wczytany tylko do statystyki. Bez danych karta się nie pokazuje.
+function NajwiecejWDanii() {
+  const [dania, setDania] = React.useState<Dane | null>(null)
+  React.useEffect(() => {
+    let aktywne = true
+    wczytajDaniaBezZdjec().then((d) => aktywne && setDania(d), () => {})
+    return () => { aktywne = false }
+  }, [])
+  if (!dania) return null
+  const wszystkie = dania.rows.length
+  const bez = dania.rows.filter((r) => !r.make).length
+  return (
+    <Najwiecej
+      tytul="Najwięcej w Danii"
+      opis={`Dzisiejsza lista Auto Midt, ${fmt(wszystkie)} aut${bez ? ` (${fmt(bez)} bez modelu: nierozpoznane albo sprzedane)` : ""}.`}
+      rows={dania.rows}
+    />
   )
 }
 
@@ -136,7 +157,10 @@ export function Home({ dane }: { dane: Dane }) {
           </Card>
         ))}
       </div>
-      <NajwiecejNaAuto1 rows={rows} />
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Najwiecej tytul="Najwięcej na Auto1" opis={`Dzisiejsza lista Auto1, ${fmt(rows.length)} aut.`} rows={rows} />
+        <NajwiecejWDanii />
+      </div>
       <div className="overflow-x-auto rounded-lg border">
         <Table>
           <TableHeader>

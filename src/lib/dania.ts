@@ -68,6 +68,11 @@ export async function wczytajDania() {
   return zPliku(plik, ADRES, await adresyZdjec(plik.cars.flatMap((c) => [...(c.image ? [c.image] : []), ...(c.images ?? [])])))
 }
 
+// Sama lista aut do statystyk na Starcie: bez podpisywania zdjęć (zdjęcia nie są tam potrzebne).
+export async function wczytajDaniaBezZdjec() {
+  return zPliku(await plikNocy<PlikDania>("dania.json"))
+}
+
 const PL_PALIWO: Record<string, string> = { petrol: "Benzyna", diesel: "Diesel", electric: "Elektryczny", hybrid: "Hybryda" }
 
 // Pola posta z auta duńskiego: cena = cena dostawcy + MARZA, w euro.

@@ -4,7 +4,7 @@ Panel AutoRadar na GitHub Pages: https://666dynamic.github.io/autoradar-panel/
 
 Podstrony: Start, Auto1, Dania (Auto Midt), Wycena, Moje auta, Ogłoszenia.
 
-Start: stan nocy i karta „Najwięcej na Auto1” (top 5 modeli, marek i typów z dzisiejszej listy Auto1; generacje modelu liczone razem, `src/lib/statystyki.ts`).
+Start: stan nocy i karty „Najwięcej na Auto1” i „Najwięcej w Danii” (top 5 modeli, marek i typów z dzisiejszej listy Auto1 i Auto Midt; generacje modelu liczone razem, `src/lib/statystyki.ts`).
 
 Dane z nocy czyta po zalogowaniu z prywatnego schowka Supabase `dane` (podpisane linki; publiczna migawka wyłączona 15.11):
 - `data.json` (Auto1, ok. 6 MB): tylko Start, Auto1, Moje auta i Ogłoszenia;
